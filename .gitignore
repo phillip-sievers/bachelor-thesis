@@ -1,9 +1,9 @@
-# data stuff 
-/data/ 
-/outputs/ 
-# maybe i dump those in the repo later. idk yet. slim for now 
+# data stuff
+/data/
+/outputs/
+# maybe i dump those in the repo later. idk yet. slim for now
 
-.env 
+.env
 *.key
 
 # py
@@ -15,4 +15,3 @@ __pycache__/
 
 # macbook
 .DS_Store
-

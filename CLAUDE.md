@@ -1,0 +1,1 @@
+/Users/phillip/repositories/bachelor-thesis/AGENTS.md

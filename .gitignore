@@ -1,0 +1,18 @@
+# data stuff 
+/data/ 
+/outputs/ 
+# maybe i dump those in the repo later. idk yet. slim for now 
+
+.env 
+*.key
+
+# py
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# macbook
+.DS_Store
+

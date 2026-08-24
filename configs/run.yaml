@@ -1,0 +1,6 @@
+seed: 20260824001
+sampling: configs/sampling.yaml
+imagery: configs/imagery.yaml
+bins: configs/bins.yaml
+render: configs/render.yaml
+models: configs/models.yaml

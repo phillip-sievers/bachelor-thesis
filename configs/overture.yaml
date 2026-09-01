@@ -1,0 +1,16 @@
+release: "2026-08-19.0" # https://docs.overturemaps.org/release-calendar/
+theme: buildings
+type: building
+bboxes:
+    - name: test_bbox
+      xmin: -103.473186
+      ymin: 44.703741
+      xmax: -103.382807
+      ymax: 44.740576
+# empricical stuff matters here. However centroid isnt relevant to labels or bucketing.
+# - percentage of footprints where centroid falls outside polygon
+# - distro of point_on_surface dte
+centroid_strategy: point_on_surface # centroid | point_on_surface | exclude_outside
+keep_fields: [id, geometry, sources, class, height, is_underground]
+cache: /Users/phillip/repositories/bachelor-thesis/data/duckdb_cache/overture.duckdb
+out: /Users/phillip/repositories/bachelor-thesis/data/footprints.parquet

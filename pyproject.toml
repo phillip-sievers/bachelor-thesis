@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "duckdb>=1.5.5",
     "geopandas>=1.1.4",
+    "matplotlib>=3.11.1",
     "planetary-computer>=1.0.0",
     "pyarrow>=25.0.1",
     "pydantic>=2.13.4",

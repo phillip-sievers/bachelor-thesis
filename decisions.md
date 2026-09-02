@@ -25,8 +25,8 @@ windowed read:
 rasterio._io Jump straight to _read()
 rasterio._io Window: Window(col_off=np.float64(2091.3484806375345), row_off=np.float64(453.2543646078557), width=np.float64(511.9999999999227), height=np.float64(511.9999999987583))
 rasterio._io IO window xoff=2091.3484806375345 yoff=453.2543646078557 width=511.9999999999227 height=511.9999999987583
-rasterio._err VSICURL: Downloading 123829135-125286130 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif?st=2026-09-01T15%3A06%3A49Z&se=2026-09-02T15%3A51%3A49Z&sp=rl&sv=2025-07-05&sr=c&skoid=9c8ff44a-6a2c-4dfb-b298-1c9212f64d9a&sktid=72f988bf-86f1-41af-91ab-2d7cd011db47&skt=2026-09-02T14%3A57%3A45Z&ske=2026-09-09T14%3A57%3A45Z&sks=b&skv=2025-07-05&sig=ox3iWzYnpxFCDtG8SeCARTvLUOZAk/Fqn5yfeJPlNbY%3D)...
-rasterio._err VSICURL: Downloading 137625156-139095429 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif?st=2026-09-01T15%3A06%3A49Z&se=2026-09-02T15%3A51%3A49Z&sp=rl&sv=2025-07-05&sr=c&skoid=9c8ff44a-6a2c-4dfb-b298-1c9212f64d9a&sktid=72f988bf-86f1-41af-91ab-2d7cd011db47&skt=2026-09-02T14%3A57%3A45Z&ske=2026-09-09T14%3A57%3A45Z&sks=b&skv=2025-07-05&sig=ox3iWzYnpxFCDtG8SeCARTvLUOZAk/Fqn5yfeJPlNbY%3D)...
+rasterio._err VSICURL: Downloading 123829135-125286130 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif...)...
+rasterio._err VSICURL: Downloading 137625156-139095429 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif...)...
 ny_m_4007317_nw_18_060_20220719 0.6 [12330, 9600]
 ```
 
@@ -35,3 +35,9 @@ THis resolves the fork at PHI-25 -> 512px is 307m
 
 Year pin: Most recent 0.6m Imagery release per state -> minimal gap to Overture Data
 We will still have to do some cleaning to verify temporal gap doesnt produce wrong labels ( built after image taken)
+
+px and py need to saved to place pin correctly
+
+### Noise
+
+Distortion of high Buildings needs to be investigated (and how many high remote buildings there are)

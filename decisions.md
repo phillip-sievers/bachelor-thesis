@@ -23,10 +23,10 @@ windowed read:
 
 ```
 rasterio._io Jump straight to _read()
-rasterio._io Window: Window(col_off=np.float64(2091.3484806375345), row_off=np.float64(453.2543646078557), width=np.float64(511.9999999999227), height=np.float64(511.9999999987583))
-rasterio._io IO window xoff=2091.3484806375345 yoff=453.2543646078557 width=511.9999999999227 height=511.9999999987583
-rasterio._err VSICURL: Downloading 123829135-125286130 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif...)...
-rasterio._err VSICURL: Downloading 137625156-139095429 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif...)...
+rasterio._io Window: Window(col_off=2091, row_off=453, width=512, height=512)
+rasterio._io IO window xoff=2091.0 yoff=453.0 width=512.0 height=512.0
+rasterio._err VSICURL: Downloading 123829135-125286130 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif?<token etc>)...
+rasterio._err VSICURL: Downloading 137625156-139095429 (https://naipeuwest.blob.core.windows.net/naip/v002/ny/2022/ny_060cm_2022/40073/m_4007317_nw_18_060_20220719.tif?<token etc>)...
 ny_m_4007317_nw_18_060_20220719 0.6 [12330, 9600]
 ```
 

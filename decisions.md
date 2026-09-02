@@ -41,3 +41,21 @@ px and py need to saved to place pin correctly
 ### Noise
 
 Distortion of high Buildings needs to be investigated (and how many high remote buildings there are)
+
+### CRS
+
+choosing to convert lat/longs from Geographic CRS to UTM. This splits USA into 6degrees each
+EPSG:269xx
+
+- minimal error
+- matches NAD83 UTM by NAIP
+- caveat: gotta pick the right zone per building -> zone lookup function
+
+#### Additonal Info
+
+Areas need to be computed in EPSG:5070 -> maintains exact areas
+Distances as said above in UTM to match imagery and conformal
+
+### Geometry
+
+Rather than modyfying invalid footprints we filter and count the exclusions. This ensures correctness.

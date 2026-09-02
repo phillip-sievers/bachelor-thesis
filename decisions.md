@@ -55,3 +55,7 @@ EPSG:269xx
 
 Areas need to be computed in EPSG:5070 -> maintains exact areas
 Distances as said above in UTM to match imagery and conformal
+
+### Geometry
+
+Rather than modyfying invalid footprints we filter and count the exclusions. This ensures correctness.

@@ -46,10 +46,26 @@ def el_chapo():
         ((50, 0), 0.0),
         ((150, 50), 50.0),
         ((200, 200), 141.4213562),
+        ((0, 0), 0.0),
     ],
 )
 def test_signed_distance_square(square, point, expected):
     assert signed_distance_m(Point(point), square) == pytest.approx(expected, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    "point",
+    [
+        (Point(50, 50)),
+        (Point(99, 50)),
+        (Point(50, 0)),
+        (Point(150, 50)),
+        (Point(200, 200)),
+        (Point(0, 0)),
+    ],
+)
+def test_sign_agrees_with_label(square, point):
+    assert (signed_distance_m(point, square) <= 0) is is_inside(point, square)
 
 
 @pytest.mark.parametrize(
@@ -78,11 +94,12 @@ def test_utm_distance_matches_geodesic():
 @pytest.mark.parametrize(
     "point, expected",
     [
-        ((50, 50), True),
-        ((99, 50), True),
-        ((50, 0), True),
-        ((150, 50), False),
-        ((200, 200), False),
+        (Point(50, 50), True),
+        (Point(99, 50), True),
+        (Point(50, 0), True),
+        (Point(150, 50), False),
+        (Point(200, 200), False),
+        (Point(0, 0), True),
     ],
 )
 def test_is_inside_square(square, point, expected):
@@ -92,8 +109,8 @@ def test_is_inside_square(square, point, expected):
 @pytest.mark.parametrize(
     "point, expected",
     [
-        ((20, 20), True),
-        ((90, 60), False),
+        (Point(20, 20), True),
+        (Point(90, 60), False),
     ],
 )
 def test_is_inside_l(el_chapo, point, expected):

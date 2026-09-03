@@ -38,6 +38,22 @@ We will still have to do some cleaning to verify temporal gap doesnt produce wro
 
 px and py need to saved to place pin correctly
 
+For edges we decided to discard edges over stitching mosaic images together. This is to ensure images are consistent for a single address.
+
+We also always pick the first of all image candidates. They overlap. I wont implement sampling logic that checks all candidates for the most center/best fitting window. The first candidate -> test -> reject if it doesnt fit path will still give us more than plenty rural candidates and houses for the dataset
+
+The error rate with this picking stretgy lies at approx 3%
+
+#### Cache decisions
+
+cache key will be (stac_item_id, col_off, row_off, size) this means we wont be susceptible to instable floats if we cached on (lat, lon, gsd, ...)
+
+We drop the NIR band, we dont need it, only RGB and store JSON pre-render. pin rendering embedded means the ablations of pin costs fetches.
+
+We alsways select the most recent 0.6m GSD this is deterministic per state and means the dataset is repro
+
+We wont resample or tamper with resolutions. We always require GSD 0.6m
+
 ### Noise
 
 Distortion of high Buildings needs to be investigated (and how many high remote buildings there are)

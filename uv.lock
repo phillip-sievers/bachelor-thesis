@@ -188,6 +188,34 @@ css = [
 ]
 
 [[package]]
+name = "cairocffi"
+version = "1.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/70/c5/1a4dc131459e68a173cbdab5fad6b524f53f9c1ef7861b7698e998b837cc/cairocffi-1.7.1.tar.gz", hash = "sha256:2e48ee864884ec4a3a34bfa8c9ab9999f688286eb714a15a43ec9d068c36557b", size = 88096, upload-time = "2024-06-18T10:56:06.741Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/93/d8/ba13451aa6b745c49536e87b6bf8f629b950e84bd0e8308f7dc6883b67e2/cairocffi-1.7.1-py3-none-any.whl", hash = "sha256:9803a0e11f6c962f3b0ae2ec8ba6ae45e957a146a004697a1ac1bbf16b073b3f", size = 75611, upload-time = "2024-06-18T10:55:59.489Z" },
+]
+
+[[package]]
+name = "cairosvg"
+version = "2.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cairocffi" },
+    { name = "cssselect2" },
+    { name = "defusedxml" },
+    { name = "pillow" },
+    { name = "tinycss2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/38/07/e8412a13019b3f737972dea23a2c61ca42becafc16c9338f4ca7a0caa993/cairosvg-2.9.0.tar.gz", hash = "sha256:1debb00cd2da11350d8b6f5ceb739f1b539196d71d5cf5eb7363dbd1bfbc8dc5", size = 40877, upload-time = "2026-03-13T15:42:00.564Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bf/e0/5011747466414c12cac8a8df77aa235068669a6a5a5df301a96209db6054/cairosvg-2.9.0-py3-none-any.whl", hash = "sha256:4b82d07d145377dffdfc19d9791bd5fb65539bb4da0adecf0bdbd9cd4ffd7c68", size = 45962, upload-time = "2026-03-14T13:56:33.512Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 source = { registry = "https://pypi.org/simple" }
@@ -512,6 +540,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/93/8a/68a4ec5c55a2971213d29a9374913f7e9f18581945a7a31d1a39b5d2dfe5/contourpy-1.3.3-cp314-cp314t-win32.whl", hash = "sha256:e74a9a0f5e3fff48fb5a7f2fd2b9b70a3fe014a67522f79b7cca4c0c7e43c9ae", size = 202428, upload-time = "2025-07-26T12:02:48.691Z" },
     { url = "https://files.pythonhosted.org/packages/fa/96/fd9f641ffedc4fa3ace923af73b9d07e869496c9cc7a459103e6e978992f/contourpy-1.3.3-cp314-cp314t-win_amd64.whl", hash = "sha256:13b68d6a62db8eafaebb8039218921399baf6e47bf85006fd8529f2a08ef33fc", size = 250331, upload-time = "2025-07-26T12:02:50.137Z" },
     { url = "https://files.pythonhosted.org/packages/ae/8c/469afb6465b853afff216f9528ffda78a915ff880ed58813ba4faf4ba0b6/contourpy-1.3.3-cp314-cp314t-win_arm64.whl", hash = "sha256:b7448cb5a725bb1e35ce88771b86fba35ef418952474492cf7c764059933ff8b", size = 203831, upload-time = "2025-07-26T12:02:51.449Z" },
+]
+
+[[package]]
+name = "cssselect2"
+version = "0.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tinycss2" },
+    { name = "webencodings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/00/2456b6b664c7a770989cbe3c352aac4eb962c938486f03a2e1255ae963c6/cssselect2-0.10.1.tar.gz", hash = "sha256:83b0d820ef589dabaf693289b647c2f5b410f76d285f56deba911ffa75a7b9d1", size = 35653, upload-time = "2026-08-31T21:57:42.59Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/59/6b1daa3b94de8970e2a2787ba73616c2d0675d2f948ef4cad8bef7f21bc6/cssselect2-0.10.1-py3-none-any.whl", hash = "sha256:25cc4494d55985d6a6da359be48da6ce98c28dcbafa2314c383ace3fc32ec868", size = 15489, upload-time = "2026-08-31T21:57:41.162Z" },
 ]
 
 [[package]]
@@ -1811,6 +1852,29 @@ wheels = [
 ]
 
 [[package]]
+name = "pycairo"
+version = "1.29.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/7c/ab4637b028d9ee12280ab9342f28310e613d5ca30c4d72d2aebeaa6a4969/pycairo-1.29.1.tar.gz", hash = "sha256:4fbd26b4af24c9787d84cf5448e34eb8dca064b732479aaecd03109520eebd5f", size = 666272, upload-time = "2026-08-07T08:45:50.095Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/72/f6/b6a2e016cf0df97b2cd094c228c9303af21d626993607d8ea750ea8b704b/pycairo-1.29.1-cp312-cp312-win32.whl", hash = "sha256:cf25a97a15bedd0cdabee5b18652de45eff70b4a7999416ed18dcee2144d17f5", size = 751363, upload-time = "2026-08-07T08:46:12.545Z" },
+    { url = "https://files.pythonhosted.org/packages/69/7e/7be1346df5ab8cd7f748f2d17d25d61f34550cfd141f60e8319e9c70df87/pycairo-1.29.1-cp312-cp312-win_amd64.whl", hash = "sha256:839cd8c98e1933426d8959168b466901b398bf4867454451023b93d91030cca9", size = 846004, upload-time = "2026-08-07T08:46:14.067Z" },
+    { url = "https://files.pythonhosted.org/packages/04/97/40966895bc12319ff3173cbb5d7876149a8e90e99bbf3b70e4af492c73a9/pycairo-1.29.1-cp312-cp312-win_arm64.whl", hash = "sha256:7cb6279cf0a7951ae9aaa21c6a0adff0fce62c0a68797b6a26a54f9a0859ad4d", size = 694560, upload-time = "2026-08-07T08:46:15.839Z" },
+    { url = "https://files.pythonhosted.org/packages/95/7d/26191cac03e8c0d957856839736ee9fb45c6d4ae68c30393895558f1f7ad/pycairo-1.29.1-cp313-cp313-win32.whl", hash = "sha256:4506a15f0dcd9d65b2706f417f8e5633e1456867d5cf272dc69c0b48e2302842", size = 750753, upload-time = "2026-08-07T08:46:17.523Z" },
+    { url = "https://files.pythonhosted.org/packages/81/ba/3499ae0f6f8be6d55ef5db620a60693b4ef925b710890bf66c17aeff036e/pycairo-1.29.1-cp313-cp313-win_amd64.whl", hash = "sha256:859f5f29d7c30fc28dbc5ce91eb30a45e0b7e447a7bd738c231dd7f9be368d1a", size = 844528, upload-time = "2026-08-07T08:46:19.1Z" },
+    { url = "https://files.pythonhosted.org/packages/91/c1/f83f25aab64418d4de6527cbf951988fc9449020e416113e3a7a4ad7e7b8/pycairo-1.29.1-cp313-cp313-win_arm64.whl", hash = "sha256:0c6159117680798da1457404b648e69b0a0eb23597b22f8a97315eaeea19f917", size = 693588, upload-time = "2026-08-07T08:46:21.087Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/ef/87408894ebef901c2accde14dcacfbdbd9bc9abe617039ee6ff382847b75/pycairo-1.29.1-cp314-cp314-win32.whl", hash = "sha256:7222587a4ae1674287c17d10d1c42c4219914f7ef64cac4b2fb995df4f7918cb", size = 767089, upload-time = "2026-08-07T08:46:25.92Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/13/aef0ea29661a2fa0cadb3cbb470b514d439efe763cafc956c8b740ad1480/pycairo-1.29.1-cp314-cp314-win_amd64.whl", hash = "sha256:f635a60b7525661b562061e4b1635670b804d1efc9c7f40796c2fa14b24c3ddf", size = 872072, upload-time = "2026-08-07T08:46:27.605Z" },
+    { url = "https://files.pythonhosted.org/packages/68/95/fc823a255ed1967ec5bda7243247a2fb484faf868c0cd1ffd1425ae515e8/pycairo-1.29.1-cp314-cp314-win_arm64.whl", hash = "sha256:b5db545cc8e59fe9bb68039db86c5ebcf9d1e6417695d0d2cb5530e67d925af9", size = 719612, upload-time = "2026-08-07T08:46:29.127Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/25/4cd521dd9e0f280930717bb93499c50008a6f14b312649d34a54dbd1df71/pycairo-1.29.1-cp314-cp314t-win_amd64.whl", hash = "sha256:3836feabfaf35ef9c502234c5924f3b2db935b6c55d8850ed190b3a58ab3b4ca", size = 874492, upload-time = "2026-08-07T08:46:22.695Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/ee/006df2caa60f2df242b9baf13ab95d4575b47acabc54f3ab6d757d3a9691/pycairo-1.29.1-cp314-cp314t-win_arm64.whl", hash = "sha256:85127fb834a8a37a550fa5c684a4c49fc546b465a64ac8df94d7728914a56279", size = 721461, upload-time = "2026-08-07T08:46:24.104Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/ec/4466cce6363c07759d04f9481f81d84a6dc506b735e795c193eb63e4f9ef/pycairo-1.29.1-cp315-cp315-win_amd64.whl", hash = "sha256:5c51bd98d2190841389845deae8243479393c1f2d9423de85e9fb4c95afebc10", size = 872007, upload-time = "2026-08-07T08:46:34.392Z" },
+    { url = "https://files.pythonhosted.org/packages/92/03/214ee759a86bd821e306c2071aef0de9c201020e7690f9cf165fa2d61d42/pycairo-1.29.1-cp315-cp315-win_arm64.whl", hash = "sha256:e923875c96cfe935d632de50aeebf49db7dffdd23f9042587c3f34af7596868e", size = 719602, upload-time = "2026-08-07T08:46:35.802Z" },
+    { url = "https://files.pythonhosted.org/packages/14/df/b163de08eb5307eacda6ee98001a4b920df8432d49f1da9b8d1c8d0342f5/pycairo-1.29.1-cp315-cp315t-win_amd64.whl", hash = "sha256:12515e71e2f17db8c40911ff089c23c465f92ddbabb89cd01304f275030c80ec", size = 874517, upload-time = "2026-08-07T08:46:30.779Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/04/81a13cde3c6685186fd79770d619c9b861d51de7450975618a85e8676772/pycairo-1.29.1-cp315-cp315t-win_arm64.whl", hash = "sha256:e5dde8dc08d92ad6935d1a45ff6ea71ea6d5739ed08dbf8677313935f94d5c6d", size = 721459, upload-time = "2026-08-07T08:46:32.19Z" },
+]
+
+[[package]]
 name = "pycparser"
 version = "3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2865,11 +2929,13 @@ name = "thesis"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cairosvg" },
     { name = "duckdb" },
     { name = "geopandas" },
     { name = "matplotlib" },
     { name = "planetary-computer" },
     { name = "pyarrow" },
+    { name = "pycairo" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rasterio" },
@@ -2885,11 +2951,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cairosvg", specifier = ">=2.9.0" },
     { name = "duckdb", specifier = ">=1.5.5" },
     { name = "geopandas", specifier = ">=1.1.4" },
     { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "planetary-computer", specifier = ">=1.0.0" },
     { name = "pyarrow", specifier = ">=25.0.1" },
+    { name = "pycairo", specifier = ">=1.29.1" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rasterio", specifier = ">=1.5.1" },

@@ -38,3 +38,8 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[pytest]
+markers = [
+    "network: marker for tesst that go trhoug the web",
+]

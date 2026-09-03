@@ -1,0 +1,8 @@
+shapes: [google_pin, dot, crosshair]
+colors:
+    red: [230, 20, 20]
+    neon_blue: [0, 130, 255]
+    neon_green: [30, 255, 130]
+size_px: 20
+opacity: 1.0
+# -> 9 variations, shapes x colors

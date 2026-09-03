@@ -44,7 +44,7 @@ We also always pick the first of all image candidates. They overlap. I wont impl
 
 The error rate with this picking stretgy lies at approx 3%
 
-#### Cache decisions
+### Cache decisions
 
 cache key will be (stac_item_id, col_off, row_off, size) this means we wont be susceptible to instable floats if we cached on (lat, lon, gsd, ...)
 
@@ -75,3 +75,9 @@ Distances as said above in UTM to match imagery and conformal
 ### Geometry
 
 Rather than modyfying invalid footprints we filter and count the exclusions. This ensures correctness.
+
+### Marker
+
+We will use three shaopes and three colors and run prompt ablations to test each variable . 9 combinations total. small ablations before the big runs.
+
+The red_dot seems to be best based on the eye test across three different surfaces. Itll be the provisional default. A final choice will happen during ablations.

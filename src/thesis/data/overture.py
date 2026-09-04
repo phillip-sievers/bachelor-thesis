@@ -1,14 +1,8 @@
 from pathlib import Path
 
 import duckdb as db
-import yaml
 
-CONF_PATH = Path("/Users/phillip/repositories/bachelor-thesis/configs/overture.yaml")
-
-
-def get_config(path: Path = CONF_PATH) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+from thesis.config import REPO_ROOT
 
 
 def connect(cache: Path) -> db.DuckDBPyConnection:
@@ -129,27 +123,10 @@ def write_geoparquet(con, out: Path) -> Path:
 
 
 def extract(config: dict) -> Path:
-    cache = Path(config["cache"])
+    cache = REPO_ROOT / Path(config["cache"])
     cache.parent.mkdir(parents=True, exist_ok=True)
     con = connect(cache)
     fetch_raw(con, config)
     build_footprints(con, config)
-    return write_geoparquet(con, config["out"])
-
-
-if __name__ == "__main__":
-    out_file = extract(get_config())
-    # df = gpd.read_parquet(out_file)
-
-    config = get_config()
-    con = connect(Path(config["cache"]))
-
-    metrics = con.sql("""
-        SELECT
-            count(*) AS n,
-            count(*) FILTER (WHERE NOT is_valid) as n_invalid,
-            count(*) FILTER (WHERE geometry_type <> 'POLYGON') as n_nonpolygon
-        FROM footprints
-    """).df()
-
-    print(metrics)
+    out = REPO_ROOT / Path(config["out"])
+    return write_geoparquet(con, out)

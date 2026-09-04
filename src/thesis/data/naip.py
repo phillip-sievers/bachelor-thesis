@@ -1,15 +1,19 @@
 import hashlib
 import json
 import os
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import numpy as np
 import planetary_computer as pc
 import rasterio
+from numpy.typing import NDArray
 from pystac_client import Client
-from rasterio.transform import rowcol
+from rasterio.crs import CRS
+from rasterio.io import DatasetReader
+from rasterio.transform import Affine, rowcol
 from rasterio.warp import transform as warp_transform
 from rasterio.windows import Window
 
@@ -27,27 +31,43 @@ class NoValidItem(Exception):
 
 
 class Tile(NamedTuple):
-    array: np.ndarray
-    metadata: dict
+    array: NDArray[np.uint8]
+    metadata: dict[str, Any]
 
 
-def cache_key(item_id, col_off, row_off, size) -> str:
+def cache_key(
+    item_id: str,
+    col_off: int | float,
+    row_off: int | float,
+    size: int,
+) -> str:
     raw = f"{item_id}|{col_off}|{row_off}|{size}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
-def cache_paths(cache_dir, key):
+def cache_paths(cache_dir: Path, key: str) -> tuple[Path, Path]:
     return cache_dir / f"{key}.npy", cache_dir / f"{key}.json"
 
 
-def pick_item(items, gsd, tolerance):
+def pick_item(
+    items: Sequence[Mapping[str, Any]],
+    gsd: float,
+    tolerance: float,
+) -> Mapping[str, Any]:
     ok = [i for i in items if abs(i["gsd"] - gsd) <= tolerance]
     if not ok:
         raise NoValidItem(f"No items with GSD {gsd}")
     return min(ok, key=lambda i: (-i["year"], i["id"]))
 
 
-def window_for(transform, width, height, x, y, size) -> tuple[Window, int, int]:
+def window_for(
+    transform: Affine,
+    width: int,
+    height: int,
+    x: float,
+    y: float,
+    size: int,
+) -> tuple[Window, int, int]:
     row, col = rowcol(transform, x, y)
     row, col = int(row), int(col)
     col_off, row_off = col - size // 2, row - size // 2
@@ -58,17 +78,26 @@ def window_for(transform, width, height, x, y, size) -> tuple[Window, int, int]:
     return Window(col_off, row_off, size, size), col - col_off, row - row_off
 
 
-def transform_coords(dst_crs, lon, lat) -> tuple[float, float]:
+def transform_coords(dst_crs: CRS, lon: float, lat: float) -> tuple[float, float]:
     (x,), (y,) = warp_transform("EPSG:4326", dst_crs, [lon], [lat])
     return x, y
 
 
-def assert_native_gsd(res, gsd, tol):
+def assert_native_gsd(
+    res: tuple[float, float],
+    gsd: float,
+    tol: float,
+) -> None:
     if any(abs(r - gsd) > tol for r in res):
         raise ResolutionMismatch(f"native GSD {res} != GSD {gsd} with tolerance {tol}")
 
 
-def store_atomic(cache_dir, key, array, metadata):
+def store_atomic(
+    cache_dir: Path,
+    key: str,
+    array: NDArray[np.uint8],
+    metadata: Mapping[str, Any],
+) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     npy, js = cache_paths(cache_dir, key)
 
@@ -81,7 +110,7 @@ def store_atomic(cache_dir, key, array, metadata):
     os.replace(tmp_js, js)
 
 
-def load_cached(cache_dir, key) -> Tile | None:
+def load_cached(cache_dir: Path, key: str) -> Tile | None:
     npy, js = cache_paths(cache_dir, key)
     if not npy.exists() or not js.exists():
         return None
@@ -90,7 +119,11 @@ def load_cached(cache_dir, key) -> Tile | None:
     return Tile(array, metadata)
 
 
-def search_items(lon, lat, config) -> list[dict]:
+def search_items(
+    lon: float,
+    lat: float,
+    config: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     catalog = Client.open(config["stac_endpoint"], modifier=pc.sign_inplace)
     search = catalog.search(
         collections=[config["collection"]],
@@ -110,19 +143,31 @@ def search_items(lon, lat, config) -> list[dict]:
     ]
 
 
-def _open_item(record):
+def _open_item(record: Mapping[str, Any]) -> DatasetReader:
     signed = pc.sign(record["item"])
     return rasterio.open(signed.assets["image"].href)
 
 
-def read_window(src, window):
+def read_window(src: DatasetReader, window: Window) -> NDArray[np.uint8]:
     arr = src.read([1, 2, 3], window=window)  # drop NIR
     if arr.shape != (3, window.height, window.width):
         raise ValueError(f"expected shape (3, {window.height}, {window.width}), got {arr.shape}")
     return arr
 
 
-def build_meta(item, src, window, px, py, lon, lat, x, y, size, gsd) -> dict:
+def build_meta(
+    item: Mapping[str, Any],
+    src: DatasetReader,
+    window: Window,
+    px: int,
+    py: int,
+    lon: float,
+    lat: float,
+    x: float,
+    y: float,
+    size: int,
+    gsd: float,
+) -> dict[str, Any]:
     return {
         "item_id": item["id"],
         "year": item["year"],
@@ -144,7 +189,13 @@ def build_meta(item, src, window, px, py, lon, lat, x, y, size, gsd) -> dict:
     }
 
 
-def fetch_tile(lat, lon, gsd, size, config) -> Tile:
+def fetch_tile(
+    lat: float,
+    lon: float,
+    gsd: float,
+    size: int,
+    config: Mapping[str, Any],
+) -> Tile:
     cache_dir = Path(config["cache_dir"])
     items = search_items(lon, lat, config)
     item = pick_item(items, gsd, tolerance=config["gsd_tolerance"])

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import geopandas as gpd
 from shapely import STRtree, minimum_rotated_rectangle
-from shapely.geometry import Point, box
+from shapely.geometry import Point, Polygon, box
 from shapely.geometry.base import BaseGeometry
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def _record_stage(name: str, count: int, input_count: int, previous_count: int) 
     return stage
 
 
-def _aspect_ratio(geometry: BaseGeometry) -> float:
+def _aspect_ratio(geometry: Polygon) -> float:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"shapely\.constructive")
         rectangle = minimum_rotated_rectangle(geometry)
@@ -78,7 +78,7 @@ def filter_footprints(
     return retained, stages
 
 
-def image_extent(center: Point, width_m: float) -> BaseGeometry:
+def image_extent(center: Point, width_m: float) -> Polygon:
     if width_m <= 0:
         raise ValueError("image width must be positive")
     half_width = width_m / 2

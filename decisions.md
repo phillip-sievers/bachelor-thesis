@@ -81,3 +81,27 @@ Rather than modyfying invalid footprints we filter and count the exclusions. Thi
 We will use three shaopes and three colors and run prompt ablations to test each variable . 9 combinations total. small ablations before the big runs.
 
 The red_dot seems to be best based on the eye test across three different surfaces. Itll be the provisional default. A final choice will happen during ablations.
+
+## Models
+
+### PHI-39 — selection frozen 2026-09-04
+
+Selected `gpt-5.6-sol`, `claude-opus-5`, and `gemini-3.6-flash`
+
+That means one frontier class of models across three providers, so three different families.
+
+The problem with open models is lack of hosting providers, the same issue applies to RS Model specialists.
+
+We lock model ID and all reasoning efforts set to 'low'. This however doesnt ensure the same reasoning effort across all three models. Thats why we also save the reasoning tokens etc.
+
+#### No open weights?
+
+Open weights does not make the experiments more reproducable. It only makes the results auditable. This study never set out to analyse the internals of the models and how they came up with the results. We solely try to establish a benchmark that lays the groundwork for agentic work of agents on geospatial imagery. The three comparable frontier model are a much more interesting case for this than smaller, less comparable open models. Furthermore the open models require very controlled and equal hardware, which i would be equally bound to by a provider sincei. dont own the needed hardware.
+
+This however leaves a explicit limitation: Observations generalize only to the providers and their model families, not all VLMs or pradigms
+
+#### No RS specialist model?
+
+Including a fine tuned model specifcially on RS data would introduce many variables that leaves us unable to attribute differences to the model: task prior, architecture, model scale, input resolution etc. Furthermore is a general RS model not trained on this specific task either.
+
+... more stuff in overleaf

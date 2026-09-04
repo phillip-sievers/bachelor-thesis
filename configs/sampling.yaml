@@ -1,6 +1,60 @@
 min_footprint_area_m2: 100
 max_aspect_ratio: 6
 
+sampling_frame:
+    target_population: eligible_overture_buildings_in_census_rural_conus
+    design: stratified_two_stage_cluster
+    seed: 20260824001
+    stratum: cec_level_1_ecoregion
+    allocation: minimum_plus_proportional_to_candidate_cells
+    bbox_grid:
+        crs: EPSG:5070
+        cell_size_m: 25000
+        bboxes_total: 120
+        minimum_bboxes_per_stratum: 3
+        selection_method: ordered_systematic_without_replacement
+        implicit_balance_order: [state, grid_x, serpentine_grid_y]
+        candidate_center_rule: inside_conus_and_outside_census_urban_area
+    building_inventory:
+        method: enumerate_all_eligible_buildings_in_selected_bboxes
+        run_before_final_sampling: true
+        empty_bbox_policy: retain_in_audit
+        sparse_bbox_policy: retain_all_available
+    building_sampling:
+        method: balanced_uniform_without_replacement
+        target_unique_buildings: 2000
+        maximum_buildings_per_bbox: 20
+        candidate_capacity_at_20_per_bbox: 2400
+        balance_fields: [bbox, state, ecoregion_code]
+        allocation: equal_bbox_base_then_deterministic_capacity_redistribution
+        sparse_group_policy: take_all_then_redistribute_shortfall
+        unreachable_target_policy: use_realized_size
+        freeze_selected_building_ids: true
+        max_samples_per_building_per_condition: 1
+    analysis:
+        primary_estimand: population_weighted_mean_over_eligible_rural_buildings
+        secondary_estimand: equal_ecoregion_macro_average
+        cluster_units: [bbox, building_id]
+        poststratification_fields: [state, ecoregion_code]
+        population_weight_formula: candidate_cells_in_ecoregion_over_selected_cells_times_eligible_buildings_in_bbox_over_sampled_buildings_in_bbox
+
+ecoregions:
+    standard: CEC North American Terrestrial Ecoregions Level I
+    source_page: https://www.epa.gov/eco-research/ecoregions-north-america
+    artifact: na_cec_eco_l1.zip
+    path: data/boundaries/na_cec_eco_l1.zip
+    sha256: fa8ddbec5711d3b0c2eeb009036e1c2ec24c5b9768ec1edcbc3735754fbdfa6e
+    code_field: NA_L1CODE
+    name_field: NA_L1NAME
+
+conus:
+    definition: census_regions_1_to_4_excluding_alaska_and_hawaii
+    tiger_release: 2025
+    artifact: tl_2025_us_state.zip
+    url: https://www2.census.gov/geo/tiger/TIGER2025/STATE/tl_2025_us_state.zip
+    path: data/boundaries/tl_2025_us_state.zip
+    sha256: 59a220888a8d9be8117c4fcd38f542bd02d81abf0d198c78113595ad540dd957
+
 image_center: moved_pin
 require_target_fully_inside: true
 reject_pin_on_other_footprint: true
@@ -10,6 +64,6 @@ census_urban:
     tiger_release: 2025
     artifact: tl_2025_us_uac20.zip
     url: https://www2.census.gov/geo/tiger/TIGER2025/UAC20/tl_2025_us_uac20.zip
-    path: /Users/phillip/repositories/bachelor-thesis/data/census/tl_2025_us_uac20.zip
+    path: data/census/tl_2025_us_uac20.zip
     sha256: e28a0b738230496b66038756a80eb1f04f9bf8c622dc2578ee46f885bb1c059c
     buffer_m: 100

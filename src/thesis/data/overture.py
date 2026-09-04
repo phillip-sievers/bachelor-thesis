@@ -32,19 +32,55 @@ def bbox_filter(boxes: list[dict]) -> str:
     )
 
 
+def replace_boxes(con, boxes: list[dict]) -> None:
+    con.execute("""
+        CREATE OR REPLACE TABLE boxes (
+            name VARCHAR,
+            grid_x INTEGER,
+            grid_y INTEGER,
+            ecoregion_code VARCHAR,
+            ecoregion_name VARCHAR,
+            state VARCHAR,
+            candidate_cells_in_ecoregion INTEGER,
+            selected_cells_in_ecoregion INTEGER,
+            cell_selection_probability DOUBLE,
+            xmin DOUBLE,
+            ymin DOUBLE,
+            xmax DOUBLE,
+            ymax DOUBLE
+        )
+    """)
+    con.executemany(
+        "INSERT INTO boxes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (
+                bbox["name"],
+                bbox["grid_x"],
+                bbox["grid_y"],
+                bbox["ecoregion_code"],
+                bbox["ecoregion_name"],
+                bbox["state"],
+                bbox["candidate_cells_in_ecoregion"],
+                bbox["selected_cells_in_ecoregion"],
+                bbox["cell_selection_probability"],
+                bbox["xmin"],
+                bbox["ymin"],
+                bbox["xmax"],
+                bbox["ymax"],
+            )
+            for bbox in boxes
+        ],
+    )
+
+
 def fetch_raw(con, config, from_aws: bool = False) -> None:
-    """S3 -> chache"""
+    """s3 -> local, unless already exists"""
+    replace_boxes(con, config["bboxes"])
     if (
         not from_aws
         and con.execute("SELECT count(*) FROM duckdb_tables() WHERE table_name = 'raw_buildings'").fetchone()[0]
     ):
         return
-
-    con.execute("CREATE OR REPLACE TABLE boxes (name VARCHAR, xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE)")
-    con.executemany(
-        "INSERT INTO boxes VALUES (?, ?, ?, ?, ?)",
-        [(b["name"], b["xmin"], b["ymin"], b["xmax"], b["ymax"]) for b in config["bboxes"]],
-    )
 
     src_url = f"s3://overturemaps-us-west-2/release/{config['release']}/theme={config['theme']}/type={config['type']}/*.parquet"
     con.execute(f"""
@@ -65,16 +101,25 @@ def build_footprints(con, config) -> None:
     con.execute("""
     CREATE OR REPLACE TABLE footprints AS
     SELECT
-        id AS building_id,
-        box_name,
-        geometry,
-        ST_Area(ST_Transform(geometry, 'OGC:CRS84', 'EPSG:5070')) AS footprint_m2_area,
-        ST_X(ST_PointOnSurface(geometry)) AS anchor_lon,
-        ST_Y(ST_PointOnSurface(geometry)) AS anchor_lat,
-        ST_IsValid(geometry) AS is_valid,
-        ST_GeometryType(geometry) as geometry_type
-    FROM raw_buildings
-    WHERE is_underground IS NOT TRUE;
+        r.id AS building_id,
+        r.box_name,
+        b.grid_x,
+        b.grid_y,
+        b.ecoregion_code,
+        b.ecoregion_name,
+        b.state,
+        b.candidate_cells_in_ecoregion,
+        b.selected_cells_in_ecoregion,
+        b.cell_selection_probability,
+        r.geometry,
+        ST_Area(ST_Transform(r.geometry, 'OGC:CRS84', 'EPSG:5070')) AS footprint_m2_area,
+        ST_X(ST_PointOnSurface(r.geometry)) AS anchor_lon,
+        ST_Y(ST_PointOnSurface(r.geometry)) AS anchor_lat,
+        ST_IsValid(r.geometry) AS is_valid,
+        ST_GeometryType(r.geometry) as geometry_type
+    FROM raw_buildings r
+    JOIN boxes b ON r.box_name = b.name
+    WHERE r.is_underground IS NOT TRUE;
     """)
 
 

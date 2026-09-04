@@ -1,6 +1,7 @@
 from itertools import product
 
 import numpy as np
+import pytest
 
 from thesis.render.marker import draw_marker
 from thesis.render.presets import load_presets
@@ -30,6 +31,48 @@ def test_colors_matching_input():
     out = draw_marker(tile, px=32, py=32, shape="dot", color=color, size_px=10, opacity=1.0)
     center_rgb = np.transpose(out, (1, 2, 0))[32, 32, :3]
     assert tuple(center_rgb) == color
+
+
+@pytest.mark.parametrize("size_px", [15, 20])
+def test_crosshair_stroke_stays_inside_its_sprite(size_px):
+    tile = np.zeros((3, 64, 64), dtype=np.uint8)
+
+    out = draw_marker(
+        tile,
+        px=32,
+        py=32,
+        shape="crosshair",
+        color=(230, 20, 20),
+        size_px=size_px,
+        opacity=1.0,
+    )
+
+    start = 32 - size_px // 2
+    sprite = out[:, start : start + size_px, start : start + size_px]
+    assert sprite.any()
+    assert not sprite[:, 0, :].any()
+    assert not sprite[:, -1, :].any()
+    assert not sprite[:, :, 0].any()
+    assert not sprite[:, :, -1].any()
+
+
+def test_google_pin_uses_bottom_center_as_hotspot():
+    tile = np.zeros((3, 64, 64), dtype=np.uint8)
+
+    out = draw_marker(
+        tile,
+        px=32,
+        py=32,
+        shape="google_pin",
+        color=(230, 20, 20),
+        size_px=20,
+        opacity=1.0,
+    )
+
+    changed = np.any(out != tile, axis=0)
+    changed_y, _ = np.nonzero(changed)
+    assert changed_y.max() == 32
+    assert changed[32, 32]
 
 
 def test_presets_loading():

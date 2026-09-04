@@ -1,0 +1,15 @@
+min_footprint_area_m2: 100
+max_aspect_ratio: 6
+
+image_center: moved_pin
+require_target_fully_inside: true
+reject_pin_on_other_footprint: true
+
+census_urban:
+    definition_year: 2020
+    tiger_release: 2025
+    artifact: tl_2025_us_uac20.zip
+    url: https://www2.census.gov/geo/tiger/TIGER2025/UAC20/tl_2025_us_uac20.zip
+    path: /Users/phillip/repositories/bachelor-thesis/data/census/tl_2025_us_uac20.zip
+    sha256: e28a0b738230496b66038756a80eb1f04f9bf8c622dc2578ee46f885bb1c059c
+    buffer_m: 100

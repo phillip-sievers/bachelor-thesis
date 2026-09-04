@@ -14,11 +14,18 @@ def surface_to_rgba(surface: cairo.ImageSurface) -> np.ndarray:
     return rgba
 
 
-def composite_patch(tile_chw: np.ndarray, patch_rgba: np.ndarray, cx: int, cy: int) -> np.ndarray:
+def composite_patch(
+    tile_chw: np.ndarray,
+    patch_rgba: np.ndarray,
+    cx: int,
+    cy: int,
+    hotspot: tuple[int, int] | None = None,
+) -> np.ndarray:
     out = tile_chw.copy()
     tile_hwc = np.transpose(out, (1, 2, 0))
     patch_h, patch_w = patch_rgba.shape[:2]
-    x0, y0 = cx - patch_w // 2, cy - patch_h // 2
+    hotspot_x, hotspot_y = hotspot or (patch_w // 2, patch_h // 2)
+    x0, y0 = cx - hotspot_x, cy - hotspot_y
 
     region = tile_hwc[y0 : y0 + patch_h, x0 : x0 + patch_w]
     alpha = patch_rgba[:, :, 3:4] / 255.0
@@ -37,15 +44,15 @@ def draw_dot(context: cairo.Context, x, y, px_size, color, opacity) -> cairo.Con
 
 def draw_crosshair(context: cairo.Context, x, y, px_size, color, opacity):
     r, g, b = [c / 255 for c in color]
+    line_width = px_size / 10
+    radius = px_size / 2 - line_width / 2 - 1
     context.set_source_rgba(r, g, b, opacity)
-    context.arc(x, y, px_size / 2, 0, 2 * np.pi)
-    context.line_to(x, y)
-    context.line_to(x - px_size / 2, y)
-    context.line_to(x, y)
-    context.line_to(x, y + px_size / 2)
-    context.line_to(x, y)
-    context.line_to(x, y - px_size / 2)
-    context.set_line_width(px_size / 10)
+    context.set_line_width(line_width)
+    context.arc(x, y, radius, 0, 2 * np.pi)
+    context.move_to(x - radius, y)
+    context.line_to(x + radius, y)
+    context.move_to(x, y - radius)
+    context.line_to(x, y + radius)
     context.stroke()
     return context
 
@@ -80,4 +87,5 @@ def draw_marker(array, px, py, shape, color, size_px, opacity):
         else:
             raise ValueError(f"Unknown shape: {shape}")
     patch_rgba = surface_to_rgba(surface)
-    return composite_patch(array, patch_rgba, px, py)
+    hotspot = (patch_rgba.shape[1] // 2, patch_rgba.shape[0] - 1) if shape == "google_pin" else None
+    return composite_patch(array, patch_rgba, px, py, hotspot=hotspot)

@@ -6,6 +6,7 @@ from functools import lru_cache
 
 from pyproj import Transformer
 from shapely.geometry import Point, Polygon
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as shapely_transform
 
 
@@ -19,7 +20,7 @@ def _transformer(epsg: int) -> Transformer:
     return Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
 
 
-def to_utm(geom, epsg: int):
+def to_utm(geom: BaseGeometry, epsg: int) -> BaseGeometry:
     tf = _transformer(epsg)
     return shapely_transform(tf.transform, geom)
 

@@ -76,6 +76,14 @@ Distances as said above in UTM to match imagery and conformal
 
 Rather than modyfying invalid footprints we filter and count the exclusions. This ensures correctness.
 
+### Define Rural and sampling
+
+Rural means the complement of the 2020 Census urban-area delineation, using the pinned 2025 TIGER `tl_2025_us_uac20.zip` artifact. Each 307.2 m image is centred on the moved pin. Full extent plus a 100 m margin must be disjoint from all urban areas. We keep valid footprints with area over 100 m2.
+
+The full target footprint and original anchor must remain in the image. Off-target pins that hit another Overture footprint are resampled. This removes known ambiguous negatives without selecting for sparse footprint coverage
+
+visible-roof disagreement and missing footprints remain for manual QA
+
 ### Marker
 
 We will use three shaopes and three colors and run prompt ablations to test each variable . 9 combinations total. small ablations before the big runs.

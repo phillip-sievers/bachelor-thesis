@@ -11,7 +11,6 @@ import planetary_computer as pc
 import rasterio
 from numpy.typing import NDArray
 from pystac_client import Client
-from rasterio.crs import CRS
 from rasterio.io import DatasetReader
 from rasterio.transform import Affine, rowcol
 from rasterio.warp import transform as warp_transform
@@ -78,7 +77,7 @@ def window_for(
     return Window(col_off, row_off, size, size), col - col_off, row - row_off
 
 
-def transform_coords(dst_crs: CRS, lon: float, lat: float) -> tuple[float, float]:
+def transform_coords(dst_crs, lon: float, lat: float) -> tuple[float, float]:
     (x,), (y,) = warp_transform("EPSG:4326", dst_crs, [lon], [lat])
     return x, y
 

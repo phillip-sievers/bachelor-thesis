@@ -25,6 +25,15 @@ def to_utm(geom: BaseGeometry, epsg: int) -> BaseGeometry:
     return shapely_transform(tf.transform, geom)
 
 
+@lru_cache(maxsize=16)
+def _reverse_transformer(epsg: int) -> Transformer:
+    return Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
+
+
+def to_wgs84(geom: BaseGeometry, epsg: int) -> BaseGeometry:
+    return shapely_transform(_reverse_transformer(epsg).transform, geom)
+
+
 def is_inside(point: Point, polygon: Polygon) -> bool:
     return polygon.covers(point)
 

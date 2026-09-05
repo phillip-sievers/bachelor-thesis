@@ -7,6 +7,6 @@ image_px: 512
 bands: [r, g, b] # dont need infrared
 year_policy: most_recent # newest 0.6m per state
 year_min: 2018
-cache_dir: /Users/phillip/repositories/bachelor-thesis/data/naip_cache/
+cache_dir: data/naip_cache/
 gsd_tolerance: 0.01
 if_on_edge: reject

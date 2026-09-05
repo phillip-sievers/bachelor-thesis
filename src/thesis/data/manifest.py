@@ -210,3 +210,28 @@ def write_manifest(path: str | Path, rows: Iterable[ManifestRow | Mapping[str, o
         raise
     finally:
         connection.close()
+
+
+def _read_manifest(path: str | Path) -> tuple[tuple[str, ...], dict[str, tuple]]:
+    with duckdb.connect(str(path), read_only=True) as connection:
+        columns = tuple(row[1] for row in connection.execute("PRAGMA table_info('samples')").fetchall())
+        sample_id_index = columns.index("sample_id")
+        rows = connection.execute("SELECT * FROM samples ORDER BY sample_id").fetchall()
+    return columns, {row[sample_id_index]: row for row in rows}
+
+
+def diff_manifests(first: str | Path, second: str | Path) -> list[str]:
+    first_columns, first_rows = _read_manifest(first)
+    second_columns, second_rows = _read_manifest(second)
+    if first_columns != second_columns:
+        return ["schema changed"]
+
+    differences = []
+    for sample_id in sorted(first_rows.keys() | second_rows.keys()):
+        if sample_id not in second_rows:
+            differences.append(f"removed: {sample_id}")
+        elif sample_id not in first_rows:
+            differences.append(f"added: {sample_id}")
+        elif first_rows[sample_id] != second_rows[sample_id]:
+            differences.append(f"changed: {sample_id}")
+    return differences

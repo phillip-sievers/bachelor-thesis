@@ -1,4 +1,5 @@
 import logging
+import random
 import warnings
 from dataclasses import dataclass
 from math import hypot
@@ -104,3 +105,54 @@ def load_urban_areas(path: str | Path, target_crs: str = "EPSG:5070") -> gpd.Geo
     if not path.exists():
         raise FileNotFoundError(path)
     return gpd.read_file(f"zip://{path}")[["geometry"]].to_crs(target_crs)
+
+
+def _largest_remainder(shares: dict, total: int) -> dict:
+    floors = {k: int(v) for k, v in shares.items()}
+    remainder = total - sum(floors.values())
+    order = sorted(shares, key=lambda k: (shares[k] - floors[k], k), reverse=True)
+    for key in order[:remainder]:
+        floors[key] += 1
+    return floors
+
+
+def allocate_building_quota(eligible_per_box, target: int, max_per_box: int) -> dict:
+    n_boxes = len(eligible_per_box)
+    base_share = target / n_boxes
+    quota = _largest_remainder({box_name: base_share for box_name in eligible_per_box.index}, target)
+
+    allocation = {box_name: min(q, eligible_per_box[box_name]) for box_name, q in quota.items()}
+    sparse = {box_name for box_name, q in quota.items() if eligible_per_box[box_name] < q}
+    shortfall = sum(quota[box_name] - allocation[box_name] for box_name in sparse)
+
+    headroom = {
+        box_name: min(max_per_box, eligible_per_box[box_name]) - quota[box_name]
+        for box_name in quota
+        if box_name not in sparse
+    }
+    total_headroom = sum(headroom.values())
+    if shortfall > 0 and total_headroom > 0:
+        redistributed = min(shortfall, total_headroom)
+        shares = {box_name: h / total_headroom * redistributed for box_name, h in headroom.items()}
+        for box_name, extra in _largest_remainder(shares, redistributed).items():
+            allocation[box_name] += extra
+    return allocation
+
+
+def sample_buildings(candidates: gpd.GeoDataFrame, target: int, max_per_box: int, seed: int) -> gpd.GeoDataFrame:
+    eligible_per_box = candidates.groupby("box_name").size()
+    quota = allocate_building_quota(eligible_per_box, target, max_per_box)
+
+    rng = random.Random(seed)
+    selected_ids = []
+    for box_name, n in quota.items():
+        pool = candidates.index[candidates["box_name"] == box_name].tolist()
+        selected_ids.extend(rng.sample(pool, k=n))
+
+    sampled = candidates.loc[selected_ids].copy()
+    sampled["eligible_buildings_in_bbox"] = sampled["box_name"].map(eligible_per_box)
+    sampled["sampled_buildings_in_bbox"] = sampled["box_name"].map(quota)
+    sampled["sampling_weight"] = (sampled["candidate_cells_in_ecoregion"] / sampled["selected_cells_in_ecoregion"]) * (
+        sampled["eligible_buildings_in_bbox"] / sampled["sampled_buildings_in_bbox"]
+    )
+    return sampled

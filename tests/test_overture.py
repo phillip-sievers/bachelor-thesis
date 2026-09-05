@@ -1,10 +1,11 @@
 import duckdb
 
-from thesis.data.overture import fetch_raw, get_config, replace_boxes
+from thesis.config import load_config
+from thesis.data.overture import fetch_raw, replace_boxes
 
 
 def test_frozen_bbox_config_is_ingestible():
-    config = get_config()
+    config = load_config("overture")
     con = duckdb.connect(":memory:")
 
     replace_boxes(con, config["bboxes"])
@@ -16,7 +17,7 @@ def test_frozen_bbox_config_is_ingestible():
 
 
 def test_cached_fetch_refreshes_bbox_metadata_without_remote_read():
-    config = get_config()
+    config = load_config("overture")
     con = duckdb.connect(":memory:")
     con.execute("CREATE TABLE raw_buildings (id VARCHAR)")
 

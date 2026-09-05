@@ -261,6 +261,19 @@ def test_write_manifest_rejects_an_existing_incompatible_schema(tmp_path):
         write_manifest(path, [])
 
 
+def test_diff_manifests_reports_changed_sample_ids(tmp_path):
+    from thesis.data.manifest import diff_manifests, write_manifest
+
+    first = tmp_path / "first.duckdb"
+    second = tmp_path / "second.duckdb"
+    row = fixed_level_row()
+    write_manifest(first, [row])
+    write_manifest(second, [{**row, "naip_year": 2023}])
+
+    assert diff_manifests(first, first) == []
+    assert diff_manifests(first, second) == [f"changed: {row['sample_id']}"]
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

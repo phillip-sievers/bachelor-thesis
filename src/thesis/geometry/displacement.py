@@ -62,7 +62,7 @@ def generate_displacements(
     for target_m in target_distances_m:
         pin = point_at_signed_distance(footprint, anchor, target_m, bearing, tolerance_m)
         actual_m = signed_distance_m(pin, footprint) if pin is not None else None
-        results.append(DisplacedPin(target_m, actual_m, bearing, pin))
+        results.append(DisplacedPin(float(target_m), actual_m, bearing, pin))
 
     circle = maximum_inscribed_circle(footprint, tolerance=tolerance_m)
     center = Point(circle.coords[0])

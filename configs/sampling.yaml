@@ -22,7 +22,7 @@ sampling_frame:
         sparse_bbox_policy: retain_all_available
     building_sampling:
         method: balanced_uniform_without_replacement
-        target_unique_buildings: 2000
+        target_unique_buildings: 2100
         maximum_buildings_per_bbox: 20
         candidate_capacity_at_20_per_bbox: 2400
         balance_fields: [bbox, state, ecoregion_code]

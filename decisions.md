@@ -113,3 +113,21 @@ This however leaves a explicit limitation: Observations generalize only to the p
 Including a fine tuned model specifcially on RS data would introduce many variables that leaves us unable to attribute differences to the model: task prior, architecture, model scale, input resolution etc. Furthermore is a general RS model not trained on this specific task either.
 
 ... more stuff in overleaf
+
+
+## Sampling
+
+We need 2100 unique locations. 100 of which will be used on a held out dataset to run marker and prompt ablations.
+
+Was a test where i just ran the candidate building
+```
+python src/thesis/run.py
+RetentionStage(name='input', count=1377087, fraction_of_input=1.0, fraction_of_previous=1.0)
+RetentionStage(name='valid_polygon', count=1377008, fraction_of_input=0.9999426325279376, fraction_of_previous=0.9999426325279376)
+RetentionStage(name='min_area_m2', count=1003510, fraction_of_input=0.7287193910043447, fraction_of_previous=0.7287611981920221)
+RetentionStage(name='max_aspect_ratio', count=1000497, fraction_of_input=0.7265314391901165, fraction_of_previous=0.9969975386393758)
+RetentionStage(name='census_rural', count=421080, fraction_of_input=0.3057758877979387, fraction_of_previous=0.42087082719888214)
+```
+
+the boxes are fine if near cities. Waht matters is the houses. i think that makes the distirbution and eval more fair than the whole 25km being rural, that leaves only super duper rural places.
+Boxes distribution: it reflects real differences in how much eligible rural land exists per ecoregion.

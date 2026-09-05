@@ -4,7 +4,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 YAML_CONFIGS = REPO_ROOT / "configs"
-KEYS = ("bins", "imagery", "overture", "models", "render", "sampling")
+KEYS = ("bins", "imagery", "overture", "models", "render", "sampling", "prompts")
 
 
 def load_run_config() -> dict:

@@ -137,3 +137,11 @@ Boxes distribution: it reflects real differences in how much eligible rural land
 We parse for a yes/no and discard if more than one foound. Furthermore we report refusals/errors separaetly. Outside of recall/precision. This means recall and precision might be inflated if model refuses on hard cases but the separate report fixes that.
 
 We dont yet need resampling. If at a lter point we want to replay over same samples for analysing determinism then we need to change the cache keys and implement an additonal sampling index or smth
+
+## Prompts / Ablations
+
+Its noted that we can't run a full prompts x 9 color/marker versions ablation. Due to cost. Furthermore it isnt the goal of our work. We only run these ablations to ensure we dont start with a broken prompt or incorrect pin. We want a general working direction, not 'ideal' prompt / corsshair and dont claim that.
+
+We dont mention specifics other than 'marker' in the prompt to ensure as little of above mentioned cross correlation as possible.
+
+We want to test prompts on the axis of context/information. Per prompt we increasingly add detail in the form of information, roles, instructions.

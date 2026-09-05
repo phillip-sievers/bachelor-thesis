@@ -1,12 +1,16 @@
 import base64
 import hashlib
+import json
+import os
 import re
 import struct
+import threading
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -37,6 +41,11 @@ class VLMResponse(BaseModel):
     retry_count: int = 0
     refusal_error_state: str | None = None
     raw_response: dict[str, Any]
+
+
+class ClassifyResponse(BaseModel):
+    vlm_response: VLMResponse
+    cache_hit: bool = False
 
 
 @dataclass(frozen=True)
@@ -74,21 +83,103 @@ def _serialize_raw_response(raw_response: Any) -> dict[str, Any]:
     return {"repr": repr(raw_response)}
 
 
+def _cache_key(settings, image_sha, prompt_sha) -> str:
+    raw = f"{settings}_{image_sha}_{prompt_sha}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _cache_path(cache_dir: Path, key: str) -> Path:
+    return cache_dir / f"{key}.json"
+
+
 class VLMClient(ABC):
     provider: str
 
-    def __init__(self, config: Mapping[str, Any], *, pricing_basis: Mapping[str, Any] | None = None):
+    def __init__(
+        self,
+        config: Mapping[str, Any],
+        *,
+        pricing_basis: Mapping[str, Any] | None = None,
+        cache_dir: Path,
+    ):
         self.config = deepcopy(dict(config))
         self.pricing_basis = deepcopy(dict(pricing_basis or {}))
+        # provider specific cache
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.log_path = self.cache_dir / "log.jsonl"
+        self._log_lock = threading.Lock()
 
-    def classify(self, image: bytes, prompt: str) -> VLMResponse:
+    def _append_to_log(self, entry: dict) -> None:
+        with self._log_lock:
+            with self.log_path.open("a") as file:
+                file.write(json.dumps(entry) + "\n")
+
+    def store_atomic(
+        self,
+        cache_dir: Path,
+        key: str,
+        parsed_response: VLMResponse,
+    ) -> None:
+        js = _cache_path(cache_dir, key)
+
+        tmp_js = cache_dir / f"{key}.tmp.json"
+        tmp_js.write_text(parsed_response.model_dump_json())
+        os.replace(tmp_js, js)
+
+    def load_cached(self, cache_dir: Path, key: str) -> VLMResponse | None:
+        js = _cache_path(cache_dir, key)
+        if not js.exists():
+            return None
+        return VLMResponse.model_validate_json(js.read_text())
+
+    def _request_with_backoff(
+        self, request: PreparedRequest, cache_key: str, max_attempts: int = 3
+    ) -> tuple[Any, float, float, int]:
+        for attempt in range(max_attempts):
+            try:
+                timestamp = time.time()
+                started = time.perf_counter()
+                raw_response = self._request(request)
+                return raw_response, timestamp, time.perf_counter() - started, attempt
+            except Exception as e:
+                self._append_to_log(
+                    {
+                        "timestamp": time.time(),
+                        "provider": self.provider,
+                        "cache_key": cache_key,
+                        "cache_hit": False,
+                        "error": repr(e),
+                    }
+                )
+                if attempt == max_attempts - 1:
+                    raise
+                time.sleep(2 ** (attempt + 1))
+        # pleasing pylance, should be unreachable
+        raise RuntimeError(f"_request_with_backoff: max_attempts must be >= 1, got {max_attempts}")
+
+    def classify(self, image: bytes, prompt: str) -> ClassifyResponse:
         request = _prepare_request(image, prompt)
         settings = self._request_settings()
-        timestamp = time.time()
-        started = time.perf_counter()
-        raw_response = self._request(request)
-        latency = time.perf_counter() - started
-        return self._parse_response(raw_response, request, settings, timestamp, latency)
+        cache_key = _cache_key(settings, request.image_sha256, request.prompt_sha256)
+        cached = self.load_cached(self.cache_dir, cache_key)
+        if cached is not None:
+            self._append_to_log(
+                {
+                    "timestamp": time.time(),
+                    "provider": self.provider,
+                    "cache_key": cache_key,
+                    "cache_hit": True,
+                }
+            )
+            return ClassifyResponse(vlm_response=cached, cache_hit=True)
+
+        raw_response, timestamp, latency, attempts = self._request_with_backoff(request, cache_key)
+        parsed_response = self._parse_response(raw_response, request, settings, timestamp, latency)
+        parsed_response.retry_count = attempts
+        self._append_to_log({**parsed_response.model_dump(mode="json"), "cache_hit": False})
+        self.store_atomic(self.cache_dir, cache_key, parsed_response)
+        return ClassifyResponse(vlm_response=parsed_response, cache_hit=False)
 
     @abstractmethod
     def _request(self, request: PreparedRequest) -> Any:

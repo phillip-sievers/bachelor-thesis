@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from google import genai
@@ -15,8 +16,9 @@ class GoogleAdapter(VLMClient):
         *,
         pricing_basis: Mapping[str, Any] | None = None,
         client: Any = None,
+        cache_dir: Path | None = None,
     ):
-        super().__init__(config, pricing_basis=pricing_basis)
+        super().__init__(config, pricing_basis=pricing_basis, cache_dir=cache_dir)
         self.client = client if client is not None else genai.Client()
 
     def _request_settings(self) -> dict[str, Any]:

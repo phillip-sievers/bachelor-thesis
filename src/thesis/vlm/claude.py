@@ -1,5 +1,6 @@
 import os
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from anthropic import Anthropic
@@ -16,10 +17,11 @@ class AnthropicAdapter(VLMClient):
         *,
         pricing_basis: Mapping[str, Any] | None = None,
         client: Any = None,
+        cache_dir: Path | None = None,
         workspace_id: str | None = None,
         max_tokens: int = 1024,
     ):
-        super().__init__(config, pricing_basis=pricing_basis)
+        super().__init__(config, pricing_basis=pricing_basis, cache_dir=cache_dir)
         self.client = client if client is not None else Anthropic()
         self.workspace_id = workspace_id or os.getenv("ANTHROPIC_WORKSPACE_ID")
         self.max_tokens = max_tokens

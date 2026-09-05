@@ -5,3 +5,4 @@ bins: configs/bins.yaml
 render: configs/render.yaml
 models: configs/models.yaml
 overture: configs/overture.yaml
+prompts: configs/prompts.yaml

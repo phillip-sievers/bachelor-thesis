@@ -1,0 +1,27 @@
+prompts:
+  - id: minimal
+    text: |
+      Is the marker in the image lying on the rooftop? Answer exactly one word: yes or no
+  - id: some_details
+    text: |
+      You see a rural aerial image.
+      Does the majority of the marked point lie on the rooftop? Answer exactly one word: yes or no
+  - id: details
+    text: |
+      The aerial image presented shows a marker in a rural area and rooftops.
+      If the majority of the marked point lies on the roof answer with yes, otherwise answer with no.
+      Only answer with a single yes or a single no
+  - id: roleplaying
+    text: |
+      You are a geospatial expert. The aerial image presented shows a marker in a rural area.
+      Analyse the image and determine precisely whether the majority of the marker lies on top of the target roof.
+      If the majority of the marked point lies on the roof answer with yes, otherwise answer with no.
+      Only answer with a single yes or a single no.
+  - id: super_detailed_and_role
+    text: |
+      You are a geospatial expert. The aerial image presented shows a marker in a rural area.
+      You will see one or more houses and other structures. Make sure to distinguish houses from other features like driveways.
+      Analyse the image and determine precisely whether the majority of the marker lies on top of the rooftop.
+      Rooftop is defined as only the main roof surfaces, detached outbuildings, overhangs or porch decks shouldn't count into your analysis.
+      If the majority of the marked point lies on the roof answer with yes, otherwise answer with no.
+      You have only two options to answer: Yes or No. Answer with only a single word, one of the two

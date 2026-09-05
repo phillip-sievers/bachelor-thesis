@@ -131,3 +131,7 @@ RetentionStage(name='census_rural', count=421080, fraction_of_input=0.3057758877
 
 the boxes are fine if near cities. Waht matters is the houses. i think that makes the distirbution and eval more fair than the whole 25km being rural, that leaves only super duper rural places.
 Boxes distribution: it reflects real differences in how much eligible rural land exists per ecoregion.
+
+# Results
+
+We parse for a yes/no and discard if more than one foound. Furthermore we report refusals/errors separaetly. Outside of recall/precision. This means recall and precision might be inflated if model refuses on hard cases but the separate report fixes that.

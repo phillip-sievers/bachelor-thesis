@@ -9,8 +9,8 @@ from thesis.config import load_config
 from thesis.vlm.claude import AnthropicAdapter
 from thesis.vlm.google import GoogleAdapter
 from thesis.vlm.openai import OpenAIAdapter
-from thesis.vlm.run import classify
-from thesis.vlm.vlm_adapter import parse_binary_answer
+from thesis.vlm.run import classify, configured_clients
+from thesis.vlm.vlm_adapter import VLMResponse, _cache_key, parse_binary_answer
 
 
 class Recorder:
@@ -20,6 +20,19 @@ class Recorder:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
+        return self.response
+
+
+class ShittyRecorder:
+    def __init__(self, response, fail_times):
+        self.response = response
+        self.fail_times = fail_times
+        self.calls = 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise RuntimeError(f"big time failure {self.calls}")
         return self.response
 
 
@@ -40,7 +53,99 @@ def model_config():
     return models, config["pricing_basis"]
 
 
-def test_openai_adapter_sends_locked_request_and_records_usage(model_config):
+def cached_openai_adapter(model_config, tmp_path):
+    models, pricing_basis = model_config
+    usage = SimpleNamespace(
+        input_tokens=1,
+        output_tokens=1,
+        output_tokens_details=SimpleNamespace(reasoning_tokens=0),
+    )
+    raw = RawResponse(
+        id="resp-cache",
+        model="gpt-5.6-sol",
+        output_text="Yes",
+        usage=usage,
+        error=None,
+        status="completed",
+        output=[],
+    )
+    requests = Recorder(raw)
+    adapter = OpenAIAdapter(
+        models["openai"],
+        pricing_basis=pricing_basis,
+        client=SimpleNamespace(responses=requests),
+        cache_dir=tmp_path,
+    )
+    return adapter, requests
+
+
+def test_cache_key_stable():
+    settings = {"model": "gpt-5.6-sol"}
+    a = _cache_key(settings, "image-sha", "prompt-sha")
+    b = _cache_key(settings, "image-sha", "prompt-sha")
+    assert a == b and len(a) == 16
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ({"model": "other"}, "image-sha", "prompt-sha"),
+        ({"model": "gpt-5.6-sol"}, "other-image-sha", "prompt-sha"),
+        ({"model": "gpt-5.6-sol"}, "image-sha", "other-prompt-sha"),
+    ],
+)
+def test_cache_key_changes(args):
+    base = _cache_key({"model": "gpt-5.6-sol"}, "image-sha", "prompt-sha")
+    assert _cache_key(*args) != base
+
+
+def test_store_then_load(tmp_path, model_config):
+    adapter, _ = cached_openai_adapter(model_config, tmp_path)
+    response = VLMResponse(
+        provider="openai",
+        raw_text="Yes",
+        parsed_answer="yes",
+        requested_model_id="gpt-5.6-sol",
+        returned_model_id="gpt-5.6-sol",
+        prompt_id="prompt-sha",
+        prompt_sha256="prompt-sha",
+        image_sha256="image-sha",
+        complete_request_settings={"model": "gpt-5.6-sol"},
+        provider_request_id="resp-1",
+        input_token_count=1,
+        image_token_count=308,
+        image_token_count_kind="estimate",
+        output_token_count=1,
+        thinking_token_count=0,
+        latency=0.1,
+        price_schedule={"tier": "standard"},
+        cost=0.000024,
+        timestamp=1.0,
+        raw_response={"id": "resp-1"},
+    )
+
+    adapter.store_atomic(tmp_path, "abc123", response)
+
+    assert adapter.load_cached(tmp_path, "abc123") == response
+
+
+def test_load_cached_missing_key_returns_none(tmp_path, model_config):
+    adapter, _ = cached_openai_adapter(model_config, tmp_path)
+    assert adapter.load_cached(tmp_path, "missing") is None
+
+
+def test_classify_cache_hit_skips_network_call_and_same_response(tmp_path, model_config):
+    adapter, requests = cached_openai_adapter(model_config, tmp_path)
+    image = png_header()
+
+    first = adapter.classify(image, "prompt")
+    second = adapter.classify(image, "prompt")
+
+    assert len(requests.calls) == 1
+    assert first.vlm_response == second.vlm_response
+
+
+def test_openai_adapter_sends_locked_request_and_records_usage(model_config, tmp_path):
     models, pricing_basis = model_config
     usage = SimpleNamespace(
         input_tokens=336,
@@ -61,10 +166,12 @@ def test_openai_adapter_sends_locked_request_and_records_usage(model_config):
         models["openai"],
         pricing_basis=pricing_basis,
         client=SimpleNamespace(responses=requests),
+        cache_dir=tmp_path,
     )
     image = png_header()
 
-    result = adapter.classify(image, "Is the pin on the roof?")
+    classify_respone = adapter.classify(image, "Is the pin on the roof?")
+    result = classify_respone.vlm_response
 
     request = requests.calls[0]
     image_part = request["input"][0]["content"][1]
@@ -84,7 +191,7 @@ def test_openai_adapter_sends_locked_request_and_records_usage(model_config):
     assert result.cost == pytest.approx(0.001464)
 
 
-def test_anthropic_adapter_sends_locked_request_and_records_usage(model_config):
+def test_anthropic_adapter_sends_locked_request_and_records_usage(model_config, tmp_path):
     models, pricing_basis = model_config
     usage = SimpleNamespace(
         input_tokens=399,
@@ -107,11 +214,13 @@ def test_anthropic_adapter_sends_locked_request_and_records_usage(model_config):
         models["anthropic"],
         pricing_basis=pricing_basis,
         client=SimpleNamespace(messages=messages),
+        cache_dir=tmp_path,
         workspace_id="workspace-1",
     )
     image = png_header()
 
-    result = adapter.classify(image, "Is the pin on the roof?")
+    classify_respone = adapter.classify(image, "Is the pin on the roof?")
+    result = classify_respone.vlm_response
 
     request = messages.calls[0]
     image_part = request["messages"][0]["content"][0]
@@ -127,7 +236,7 @@ def test_anthropic_adapter_sends_locked_request_and_records_usage(model_config):
     assert result.cost == pytest.approx(0.002195)
 
 
-def test_google_adapter_sends_locked_request_and_records_modality_usage(model_config):
+def test_google_adapter_sends_locked_request_and_records_modality_usage(model_config, tmp_path):
     models, pricing_basis = model_config
     usage = SimpleNamespace(
         total_input_tokens=1112,
@@ -151,10 +260,12 @@ def test_google_adapter_sends_locked_request_and_records_modality_usage(model_co
         models["google"],
         pricing_basis=pricing_basis,
         client=SimpleNamespace(interactions=interactions),
+        cache_dir=tmp_path,
     )
     image = png_header()
 
-    result = adapter.classify(image, "Is the pin on the roof?")
+    classify_respone = adapter.classify(image, "Is the pin on the roof?")
+    result = classify_respone.vlm_response
 
     request = interactions.calls[0]
     image_part = request["input"][1]
@@ -168,13 +279,14 @@ def test_google_adapter_sends_locked_request_and_records_modality_usage(model_co
     assert result.cost == pytest.approx(0.0014565)
 
 
-def test_adapter_rejects_non_512_png_before_calling_provider(model_config):
+def test_adapter_rejects_non_512_png_before_calling_provider(model_config, tmp_path):
     models, pricing_basis = model_config
     requests = Recorder(None)
     adapter = OpenAIAdapter(
         models["openai"],
         pricing_basis=pricing_basis,
         client=SimpleNamespace(responses=requests),
+        cache_dir=tmp_path,
     )
 
     with pytest.raises(ValueError, match="512x512 PNG"):
@@ -183,7 +295,7 @@ def test_adapter_rejects_non_512_png_before_calling_provider(model_config):
     assert requests.calls == []
 
 
-def test_response_records_content_hashes(model_config):
+def test_response_records_content_hashes(model_config, tmp_path):
     models, pricing_basis = model_config
     usage = SimpleNamespace(
         input_tokens=1,
@@ -203,11 +315,13 @@ def test_response_records_content_hashes(model_config):
         models["openai"],
         pricing_basis=pricing_basis,
         client=SimpleNamespace(responses=Recorder(raw)),
+        cache_dir=tmp_path,
     )
     image = png_header()
     prompt = "prompt"
 
-    result = adapter.classify(image, prompt)
+    classify_respone = adapter.classify(image, prompt)
+    result = classify_respone.vlm_response
 
     assert result.image_sha256 == hashlib.sha256(image).hexdigest()
     assert result.prompt_sha256 == hashlib.sha256(prompt.encode()).hexdigest()
@@ -251,3 +365,91 @@ def test_classify_runs_identical_input_through_every_client():
 
     assert results == {provider: provider for provider in ("openai", "anthropic", "google")}
     assert all(client.calls == [(image, prompt)] for client in clients)
+
+
+def test_configured_clients_creates_resolved_cache_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr("thesis.vlm.run.REPO_ROOT", tmp_path)
+    stubs = {"openai": object(), "anthropic": object(), "google": object()}
+
+    clients = configured_clients(sdk_clients=stubs)
+
+    by_provider = {client.provider: client for client in clients}
+    assert by_provider["openai"].cache_dir == tmp_path / "data/vlm_cache/openai"
+    assert by_provider["openai"].cache_dir.exists()
+
+
+def test_classify_retries_then_succeeds(model_config, tmp_path, monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda x: None)
+    models, pricing_basis = model_config
+    usage = SimpleNamespace(
+        input_tokens=399,
+        output_tokens=8,
+        output_tokens_details=SimpleNamespace(thinking_tokens=3),
+    )
+    raw = RawResponse(
+        id="msg-1",
+        model="claude-opus-5",
+        content=[
+            SimpleNamespace(type="thinking", thinking=""),
+            SimpleNamespace(type="text", text="Yes."),
+        ],
+        usage=usage,
+        stop_reason="end_turn",
+        stop_details=None,
+    )
+
+    messages = ShittyRecorder(raw, fail_times=2)
+
+    adapter = AnthropicAdapter(
+        models["anthropic"],
+        pricing_basis=pricing_basis,
+        client=SimpleNamespace(messages=messages),
+        cache_dir=tmp_path,
+        workspace_id="workspace-1",
+    )
+    image = png_header()
+    prompt = "prompt"
+
+    classify_respone = adapter.classify(image, prompt)
+    result = classify_respone.vlm_response
+
+    assert messages.calls == 3
+    assert result.raw_text == "Yes."
+    assert result.retry_count == 2
+    assert classify_respone.cache_hit is False
+
+
+def test_classify_raises_after_retries(model_config, tmp_path, monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda x: None)
+    models, pricing_basis = model_config
+    usage = SimpleNamespace(
+        input_tokens=399,
+        output_tokens=8,
+        output_tokens_details=SimpleNamespace(thinking_tokens=3),
+    )
+    raw = RawResponse(
+        id="msg-1",
+        model="claude-opus-5",
+        content=[
+            SimpleNamespace(type="thinking", thinking=""),
+            SimpleNamespace(type="text", text="Yes."),
+        ],
+        usage=usage,
+        stop_reason="end_turn",
+        stop_details=None,
+    )
+
+    messages = ShittyRecorder(raw, fail_times=100000)
+
+    adapter = AnthropicAdapter(
+        models["anthropic"],
+        pricing_basis=pricing_basis,
+        client=SimpleNamespace(messages=messages),
+        cache_dir=tmp_path,
+        workspace_id="workspace-1",
+    )
+    image = png_header()
+    prompt = "prompt"
+
+    with pytest.raises(RuntimeError, match="big time failure 3"):
+        adapter.classify(image, prompt)

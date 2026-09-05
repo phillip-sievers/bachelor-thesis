@@ -1,7 +1,6 @@
 import hashlib
 import json
 import os
-import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -196,7 +195,7 @@ def fetch_tile(
     size: int,
     config: Mapping[str, Any],
 ) -> Tile:
-    time.sleep(0.75)
+    # time.sleep(0.75)
 
     cache_dir = Path(config["cache_dir"])
     items = search_items(lon, lat, config)

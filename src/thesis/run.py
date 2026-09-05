@@ -195,10 +195,16 @@ def displace_candidates(candidates: gpd.GeoDataFrame) -> tuple[list[dict], list[
 
 
 def _pin_key(entry: dict) -> str:
-    return json.dumps(
-        [str(entry["building_id"]), entry["pin"].target_signed_distance_m],
-        separators=(",", ":"),
-    )
+    target = entry["pin"].target_signed_distance_m
+    return json.dumps([str(entry["building_id"]), target], separators=(",", ":"))
+
+
+# some duplicate, doesnt really matter for now, TODO deduplicate
+def _old_int_pin_key(entry: dict) -> str | None:
+    target = entry["pin"].target_signed_distance_m
+    if target is None or target != int(target):
+        return None
+    return json.dumps([str(entry["building_id"]), int(target)], separators=(",", ":"))
 
 
 def _serialize_entry(entry: dict) -> dict:
@@ -257,12 +263,14 @@ def fetch_imagery(
     tiles, rejections = [], []
     for entry in pins:
         pin_key = _pin_key(entry)
-        if pin_key in completed_tiles:
-            cached = naip.load_cached(Path(imagery_config["cache_dir"]), completed_tiles[pin_key])
+        legacy_key = _old_int_pin_key(entry)
+        known_key = pin_key if pin_key in completed_tiles else (legacy_key if legacy_key in completed_tiles else None)
+        if known_key is not None:
+            cached = naip.load_cached(Path(imagery_config["cache_dir"]), completed_tiles[known_key])
             if cached is not None:
                 tiles.append((entry, cached))
                 continue
-        if pin_key in rejected_keys:
+        if pin_key in rejected_keys or (legacy_key is not None and legacy_key in rejected_keys):
             continue
 
         try:
@@ -275,10 +283,7 @@ def fetch_imagery(
             )
             tiles.append((entry, tile))
             completed_tiles[pin_key] = naip.cache_key(
-                tile.metadata["item_id"],
-                tile.metadata["col_off"],
-                tile.metadata["row_off"],
-                tile.metadata["size"],
+                tile.metadata["item_id"], tile.metadata["col_off"], tile.metadata["row_off"], tile.metadata["size"]
             )
         except (naip.TileOutOfBounds, naip.ResolutionMismatch, naip.NoValidItem) as e:
             failure = {

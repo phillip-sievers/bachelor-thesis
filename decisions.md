@@ -135,3 +135,5 @@ Boxes distribution: it reflects real differences in how much eligible rural land
 # Results
 
 We parse for a yes/no and discard if more than one foound. Furthermore we report refusals/errors separaetly. Outside of recall/precision. This means recall and precision might be inflated if model refuses on hard cases but the separate report fixes that.
+
+We dont yet need resampling. If at a lter point we want to replay over same samples for analysing determinism then we need to change the cache keys and implement an additonal sampling index or smth

@@ -1,6 +1,9 @@
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 YAML_CONFIGS = REPO_ROOT / "configs"

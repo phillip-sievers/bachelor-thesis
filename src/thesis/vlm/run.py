@@ -15,7 +15,7 @@ ADAPTERS = {
 }
 
 # bottleneck is OpenAI w 500RPM, we stay below that cause not in a rush
-POOL_SIZE = 7
+POOL_SIZE = 15
 
 
 def configured_clients(*, sdk_clients: Mapping[str, Any] | None = None) -> list[VLMClient]:
@@ -58,4 +58,15 @@ def run_dataset(
 
     with ThreadPoolExecutor(max_workers=len(active_clients)) as outer:
         futures = {client.provider: outer.submit(run_provider, client) for client in active_clients}
-        return {provider: future.result() for provider, future in futures.items()}
+        results, errors = {}, {}
+        for provider, future in futures.items():
+            try:
+                results[provider] = future.result()
+            except Exception as e:
+                errors[provider] = e
+
+        if errors:
+            for provider, e in errors.items():
+                print(f"{provider} failed: {e!r}")
+
+        return results

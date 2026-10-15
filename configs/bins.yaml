@@ -1,31 +1,20 @@
 unit: m
 sign_convention: negative_inside_positive_outside
+sampling_distribution: uniform_in_log_absolute_distance
+slot_tolerance_m: 0.3
+minimum_absolute_distance_m: 0.3
 
-# Exact target distances, not intervals. The generator samples one bearing per
-# building and solves along that ray until the requested signed edge distance
-# is reached.
-fixed_levels_m:
-    inside: [-5, -3, -1]
-    outside: [1, 3, 5, 10, 20, 40, 80]
-target_tolerance_m: 0.1
+bins:
+  - {id: -5, lower_m: -5.0, upper_m: -3.872983346207417, include_upper: false, repeats: 1}
+  - {id: -3, lower_m: -3.872983346207417, upper_m: -1.7320508075688772, include_upper: false, repeats: 1}
+  - {id: -1, lower_m: -1.7320508075688772, upper_m: -0.3, include_upper: true, repeats: 3}
+  - {id: 1, lower_m: 0.3, upper_m: 1.7320508075688772, include_upper: false, repeats: 3}
+  - {id: 3, lower_m: 1.7320508075688772, upper_m: 3.872983346207417, include_upper: false, repeats: 1}
+  - {id: 5, lower_m: 3.872983346207417, upper_m: 7.0710678118654755, include_upper: false, repeats: 1}
+  - {id: 10, lower_m: 7.0710678118654755, upper_m: 14.142135623730951, include_upper: false, repeats: 1}
+  - {id: 20, lower_m: 14.142135623730951, upper_m: 28.284271247461902, include_upper: false, repeats: 1}
+  - {id: 40, lower_m: 28.284271247461902, upper_m: 56.568542494923804, include_upper: false, repeats: 1}
+  - {id: 80, lower_m: 56.568542494923804, upper_m: 80.0, include_upper: true, repeats: 1}
 
-bearing:
-    origin: point_on_surface_anchor
-    distribution: uniform
-    range_radians: [0.0, 6.283185307179586]
-    one_per_building: true
-    shared_across_levels: true
-
-unreachable_inside:
-    policy: record_unavailable
-    clamp: false
-    resample_bearing: false
-
-# This gives every building one strong positive control without pretending
-# that different buildings share the same deep-interior distance.
-deep_inside_control:
-    enabled: true
-    method: maximum_inscribed_circle_center
-    record_actual_signed_distance: true
-    include_in_distance_curve: false
-    analysis_role: control_only
+unavailable_reason_codes: [size, ownership, crop, other]
+delta_policy: post_hoc

@@ -19,17 +19,18 @@ class AnthropicAdapter(VLMClient):
         client: Any = None,
         cache_dir: Path | None = None,
         workspace_id: str | None = None,
-        max_tokens: int = 1024,
     ):
         super().__init__(config, pricing_basis=pricing_basis, cache_dir=cache_dir)
         self.client = client if client is not None else Anthropic()
         self.workspace_id = workspace_id or os.getenv("ANTHROPIC_WORKSPACE_ID")
-        self.max_tokens = max_tokens
+        # Anthropic must have max_tokens. 16000 is sufficient for thinking and below the SDK limit without streaming.
+        self.max_tokens = self.inference["max_output_tokens"] or 16000
 
     def _request_settings(self) -> dict[str, Any]:
         settings = {
             "model": self.config["model"],
             "max_tokens": self.max_tokens,
+            **self._common_settings({"temperature": "temperature"}),
             **self.config["parameters"],
             "image": {"media_type": "image/png"},
         }
@@ -37,10 +38,11 @@ class AnthropicAdapter(VLMClient):
             settings["workspace_id"] = self.workspace_id
         return settings
 
-    def _request(self, request: PreparedRequest) -> Any:
-        kwargs = {
+    def _request_body(self, request: PreparedRequest) -> dict[str, Any]:
+        return {
             "model": self.config["model"],
             "max_tokens": self.max_tokens,
+            **self._common_settings({"temperature": "temperature"}),
             **self.config["parameters"],
             "messages": [
                 {
@@ -59,9 +61,26 @@ class AnthropicAdapter(VLMClient):
                 }
             ],
         }
-        if self.workspace_id:
-            kwargs["workspace_id"] = self.workspace_id
-        return self.client.messages.create(**kwargs)
+
+    def _workspace(self) -> dict[str, Any]:
+        return {"workspace_id": self.workspace_id} if self.workspace_id else {}
+
+    def _request(self, request: PreparedRequest) -> Any:
+        return self.client.messages.create(**self._request_body(request), **self._workspace())
+
+    batch_max_bytes = 240_000_000  # Limit: 256 MB for each batch.
+
+    def _submit_batch(self, bodies: dict[str, dict[str, Any]]) -> str:
+        requests = [{"custom_id": key, "params": body} for key, body in bodies.items()]
+        return self.client.messages.batches.create(requests=requests, **self._workspace()).id
+
+    def _batch_results(self, batch_id: str) -> dict[str, Any] | None:
+        if self.client.messages.batches.retrieve(batch_id, **self._workspace()).processing_status != "ended":
+            return None
+        return {
+            entry.custom_id: entry.result.message if entry.result.type == "succeeded" else None
+            for entry in self.client.messages.batches.results(batch_id, **self._workspace())
+        }
 
     def _parse_response(
         self,

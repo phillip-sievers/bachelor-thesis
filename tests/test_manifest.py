@@ -1,291 +1,300 @@
+from datetime import UTC, date, datetime
+
 import duckdb
 import pytest
 from pydantic import ValidationError
 
+from thesis.data.manifest import (
+    BoxRecord,
+    DeviationRecord,
+    ManifestBundle,
+    PinRecord,
+    RenderRecord,
+    RunRecord,
+    SourceRecord,
+    write_manifest,
+)
 
-def fixed_level_row(**overrides):
+BIN_IDS = (-5, -3, -1, 1, 3, 5, 10, 20, 40, 80)
+
+
+def _run(**overrides):
     row = {
-        "manifest_schema_version": 1,
-        "sample_id": "sample-1",
-        "image_path": "images/sample-1.png",
+        "schema_version": 2,
+        "run_id": "run-v2",
+        "created_at": datetime(2026, 9, 10, 10, 0, tzinfo=UTC),
         "config_hash": "a" * 64,
         "git_commit": "b" * 40,
-        "building_id": "building-1",
-        "bbox_name": "eco_9_2_box_01",
-        "state": "KS",
-        "ecoregion_code": "9.2",
-        "bbox_selection_probability": 0.01,
-        "eligible_buildings_in_bbox": 100,
-        "sampled_buildings_in_bbox": 20,
-        "sampling_weight": 500.0,
+        "code_version": "c" * 64,
         "overture_release": "2026-08-19.0",
-        "footprint_source": "overture",
-        "footprint_area_m2": 150.0,
-        "target_anchor_lat": 38.5,
-        "target_anchor_lon": -98.0,
-        "displacement_role": "fixed_level",
-        "target_signed_edge_distance_m": 1.0,
-        "actual_signed_edge_distance_m": 1.02,
-        "radial_displacement_m": 8.0,
-        "bearing_radians": 1.5,
-        "pin_lat": 38.50001,
-        "pin_lon": -97.99999,
-        "ground_truth_inside": False,
-        "include_in_distance_curve": True,
-        "naip_item_id": "m_3809801_ne_14_060_20220830",
-        "naip_year": 2022,
-        "naip_state": "ks",
-        "naip_native_gsd_x_m": 0.6,
-        "naip_native_gsd_y_m": 0.6,
+        "area_log_cuts": (5.0452346355471915, 5.518237342793738),
+        "coverage_threshold": 0.5,
+        "screen_per_box_cap": 200,
+        "spill_revisit_fraction": 0.05,
+        "delta_m": None,
+        "census_urban_vintage": "2020 UA / TIGER 2025",
+        "ecoregion_artifact": "na_cec_eco_l1.zip",
+        "seeds": {
+            "box_quota": 1,
+            "screen_subsample": 2,
+            "candidate_order": 3,
+            "pin_sampling": 4,
+            "ablation_assignment": 5,
+            "deficit_spill": 6,
+            "delta_reduction": 7,
+            "sanity_render": 8,
+        },
+        "ecoregion_merge_mapping": {str(value): str(value) for value in (5, 6, 7, 8, 9, 10, 11, 12, 13, 15)},
+    }
+    row.update(overrides)
+    return row
+
+
+def _box(**overrides):
+    row = {
+        "run_id": "run-v2",
+        "box_id": "eco-9-box-1",
+        "ecoregion_code": "9",
+        "ecoregion_name": "GREAT PLAINS",
+        "state": "KS",
+        "center_rural": True,
+        "full_pool_count": 1_000,
+        "content_pool_count": 800,
+        "rural_content_pool_count": 750,
+        "eligible_count": 700,
+        "screened_count": 700,
+        "scene_rural_loss": 50,
+        "box_containment_loss": 25,
+        "tile_containment_loss": 25,
+        "spacing_loss": 1,
+        "main_quota": 17,
+        "realized_main": 17,
+        "spill_in": 0,
+        "spill_out": 0,
+        "zero_eligible_reason": None,
+        "box_selection_probability": 0.01,
+        "imagery_dates": (date(2024, 7, 1),),
+        "imagery_seasons": ("summer",),
+        "footprint_provenance_mix": {"msft": 0.7, "osm": 0.3},
+    }
+    row.update(overrides)
+    return row
+
+
+def _source(**overrides):
+    availability = {str(bin_id): True for bin_id in BIN_IDS}
+    row = {
+        "run_id": "run-v2",
+        "source_id": "source-1",
+        "box_id": "eco-9-box-1",
+        "quota_box_id": "eco-9-box-1",
+        "ecoregion_code": "9",
+        "building_stratum": "medium",
+        "assignment": "main",
+        "state": "KS",
+        "source_footprint_provenance": "msft",
+        "footprint_area_m2": 180.0,
+        "source_anchor_lat": 38.5,
+        "source_anchor_lon": -98.0,
+        "nearest_neighbor_distance_m": 50.0,
+        "neighbors_within_80m": 2,
+        "scene_id": "scene-1",
+        "naip_item_id": "naip-item",
         "naip_source_crs": "EPSG:26914",
-        "rendered_gsd_m": 0.6,
-        "image_px": 512,
+        "naip_item_transform": (0.6, 0.0, 50.0, 0.0, -0.6, 250.0),
+        "imagery_date": date(2024, 7, 1),
+        "imagery_season": "summer",
+        "bin_availability": availability,
+        "unavailability_reasons": {},
+        "innermost_signed_distance_m": -6.0,
+        "outermost_signed_distance_m": 120.0,
+        "complete_source": True,
+        "complete_inside": True,
+        "scene_rural": True,
+        "rejection_provenance": (),
+        "scene_window": (10, 20, 800, 800),
+        "scene_transform": (0.6, 0.0, 100.0, 0.0, -0.6, 200.0),
+    }
+    row.update(overrides)
+    return row
+
+
+def _pin(**overrides):
+    row = {
+        "run_id": "run-v2",
+        "pin_id": "pin-1",
+        "source_id": "source-1",
+        "bin_id": 1,
+        "bin_lower_m": 0.3,
+        "bin_upper_m": 3**0.5,
+        "repeat_index": 0,
+        "target_signed_distance_m": 1.1,
+        "exact_signed_distance_m": 1.05,
+        "ground_truth_inside": False,
+        "tip_row": 256,
+        "tip_col": 256,
+        "tip_x": 123.3,
+        "tip_y": 456.7,
+        "tip_lat": 38.5,
+        "tip_lon": -98.0,
+        "owning_polygon_id": "source-1",
+        "nearest_polygon_id": "source-1",
+        "nearest_polygon_provenance": "msft",
+        "nearest_edge_bearing_radians": 1.2,
+        "radial_displacement_m": 4.0,
+        "source_to_pin_bearing_radians": 2.0,
+        "crop_window": (100, 200, 512, 512),
+        "crop_transform": (0.6, 0.0, 100.0, 0.0, -0.6, 200.0),
+    }
+    row.update(overrides)
+    return row
+
+
+def _render(**overrides):
+    row = {
+        "run_id": "run-v2",
+        "render_id": "render-1",
+        "pin_id": "pin-1",
+        "preset_id": "google-red",
         "marker_shape": "google_pin",
         "marker_color": "red",
         "marker_size_px": 15,
         "marker_opacity": 1.0,
-        "census_urban_artifact": "tl_2025_us_uac20.zip",
-        "census_buffer_m": 100.0,
+        "prompt_variant": "main",
+        "image_path": "images/render-1.png",
+        "image_sha256": "d" * 64,
     }
     row.update(overrides)
-    if "sample_id" not in overrides:
-        from thesis.data.manifest import sample_id_for
-
-        row["sample_id"] = sample_id_for(
-            building_id=row["building_id"],
-            displacement_role=row["displacement_role"],
-            target_signed_edge_distance_m=row["target_signed_edge_distance_m"],
-            marker_shape=row["marker_shape"],
-            marker_color=row["marker_color"],
-        )
     return row
 
 
-def test_manifest_row_accepts_the_locked_fixed_level_schema():
-    from thesis.data.manifest import ManifestRow
-
-    row = ManifestRow.model_validate(fixed_level_row())
-
-    assert row.manifest_schema_version == 1
-    assert row.target_signed_edge_distance_m == pytest.approx(1.0)
-
-
-def test_manifest_row_accepts_the_deep_inside_control():
-    from thesis.data.manifest import ManifestRow
-
-    row = ManifestRow.model_validate(
-        fixed_level_row(
-            displacement_role="deep_inside_control",
-            target_signed_edge_distance_m=None,
-            actual_signed_edge_distance_m=-8.2,
-            bearing_radians=None,
-            ground_truth_inside=True,
-            include_in_distance_curve=False,
-        )
+def _bundle():
+    return ManifestBundle(
+        run=RunRecord.model_validate(_run()),
+        boxes=(BoxRecord.model_validate(_box()),),
+        sources=(SourceRecord.model_validate(_source()),),
+        pins=(PinRecord.model_validate(_pin()),),
+        renders=(RenderRecord.model_validate(_render()),),
+        deviations=(),
     )
 
-    assert row.target_signed_edge_distance_m is None
-    assert row.bearing_radians is None
 
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"displacement_role": "unknown"},
-        {"target_signed_edge_distance_m": None},
-        {"bearing_radians": None},
-        {"include_in_distance_curve": False},
-        {
-            "displacement_role": "deep_inside_control",
-            "target_signed_edge_distance_m": -5.0,
-            "actual_signed_edge_distance_m": -8.2,
-            "bearing_radians": None,
-            "ground_truth_inside": True,
-            "include_in_distance_curve": False,
-        },
-        {
-            "displacement_role": "deep_inside_control",
-            "target_signed_edge_distance_m": None,
-            "actual_signed_edge_distance_m": -8.2,
-            "bearing_radians": 1.5,
-            "ground_truth_inside": True,
-            "include_in_distance_curve": False,
-        },
-        {
-            "displacement_role": "deep_inside_control",
-            "target_signed_edge_distance_m": None,
-            "actual_signed_edge_distance_m": -8.2,
-            "bearing_radians": None,
-            "ground_truth_inside": True,
-            "include_in_distance_curve": True,
-        },
-    ],
-)
-def test_manifest_row_rejects_displacement_role_mismatches(overrides):
-    from thesis.data.manifest import ManifestRow
-
-    with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(**overrides))
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"manifest_schema_version": 2},
-        {"unexpected_future_field": "silent schema drift"},
-    ],
-)
-def test_manifest_row_rejects_schema_drift(overrides):
-    from thesis.data.manifest import ManifestRow
-
-    with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(**overrides))
-
-
-@pytest.mark.parametrize("image_path", ["/tmp/sample.png", "../sample.png", ""])
-def test_manifest_row_requires_a_relative_dataset_image_path(image_path):
-    from thesis.data.manifest import ManifestRow
-
-    with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(image_path=image_path))
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"actual_signed_edge_distance_m": 1.0, "ground_truth_inside": True},
-        {"actual_signed_edge_distance_m": -1.0, "ground_truth_inside": False},
-        {
-            "displacement_role": "deep_inside_control",
-            "target_signed_edge_distance_m": None,
-            "actual_signed_edge_distance_m": 1.0,
-            "bearing_radians": None,
-            "ground_truth_inside": False,
-            "include_in_distance_curve": False,
-        },
-    ],
-)
-def test_manifest_row_rejects_inconsistent_ground_truth(overrides):
-    from thesis.data.manifest import ManifestRow
-
-    with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(**overrides))
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"bbox_selection_probability": 0.0},
-        {"eligible_buildings_in_bbox": 0},
-        {"sampled_buildings_in_bbox": 0},
-        {"sampled_buildings_in_bbox": 101},
-        {"sampling_weight": 0.0},
-        {"footprint_area_m2": 0.0},
-        {"target_anchor_lat": 91.0},
-        {"target_anchor_lon": 181.0},
-        {"radial_displacement_m": -1.0},
-        {"bearing_radians": 6.283185307179586},
-        {"pin_lat": -91.0},
-        {"pin_lon": -181.0},
-        {"naip_year": 0},
-        {"naip_native_gsd_x_m": 0.0},
-        {"naip_native_gsd_y_m": 0.0},
-        {"rendered_gsd_m": 0.0},
-        {"image_px": 0},
-        {"marker_size_px": 0},
-        {"marker_opacity": 1.1},
-        {"census_buffer_m": -1.0},
-        {"image_px": "512"},
-    ],
-)
-def test_manifest_row_rejects_out_of_domain_values(overrides):
-    from thesis.data.manifest import ManifestRow
-
-    with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(**overrides))
-
-
-def test_sample_id_is_stable_for_the_semantic_sample_identity():
-    from thesis.data.manifest import sample_id_for
-
-    sample_id = sample_id_for(
-        building_id="building-1",
-        displacement_role="fixed_level",
-        target_signed_edge_distance_m=1.0,
-        marker_shape="google_pin",
-        marker_color="red",
-    )
-
-    assert sample_id == "e2fdaec7c8a7c35f26c9b51d56959601c3cf2868559f6b9e3e2601297863bef2"
-
-
-def test_manifest_row_rejects_a_sample_id_from_different_semantics():
-    from thesis.data.manifest import ManifestRow
-
-    with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(sample_id="wrong"))
-
-
-def test_write_manifest_creates_the_typed_samples_table(tmp_path):
-    from thesis.data.manifest import write_manifest
-
+def test_v2_manifest_writes_all_normalized_tables(tmp_path):
     path = tmp_path / "manifest.duckdb"
-    row = fixed_level_row()
 
-    write_manifest(path, [row])
+    write_manifest(path, _bundle())
 
     with duckdb.connect(str(path), read_only=True) as connection:
-        stored = connection.execute(
-            "SELECT sample_id, image_path, target_signed_edge_distance_m FROM samples"
+        assert {name for (name,) in connection.execute("SHOW TABLES").fetchall()} == {
+            "runs",
+            "boxes",
+            "sources",
+            "pins",
+            "renders",
+            "deviations",
+            "samples",
+        }
+        source = connection.execute("SELECT assignment, complete_source, bin_availability FROM sources").fetchone()
+    assert source[0:2] == ("main", True)
+    assert source[2]["-5"] is True
+    with duckdb.connect(str(path), read_only=True) as connection:
+        compatible = connection.execute(
+            """
+            SELECT sample_id, building_id, target_signed_edge_distance_m,
+                   actual_signed_edge_distance_m, naip_source_crs
+            FROM samples
+            """
         ).fetchone()
-    assert stored == (row["sample_id"], "images/sample-1.png", 1.0)
+    assert compatible == ("render-1", "source-1", 1.1, 1.05, "EPSG:26914")
 
 
-def test_write_manifest_rejects_duplicate_sample_ids(tmp_path):
-    from thesis.data.manifest import write_manifest
+def test_partial_source_requires_one_reason_per_unavailable_bin():
+    availability = {str(bin_id): True for bin_id in BIN_IDS}
+    availability["-5"] = False
 
-    row = fixed_level_row()
+    with pytest.raises(ValidationError, match="unavailability"):
+        SourceRecord.model_validate(
+            _source(
+                bin_availability=availability,
+                unavailability_reasons={},
+                complete_source=False,
+                complete_inside=False,
+            )
+        )
 
-    with pytest.raises(duckdb.ConstraintException):
-        write_manifest(tmp_path / "manifest.duckdb", [row, row])
+    source = SourceRecord.model_validate(
+        _source(
+            bin_availability=availability,
+            unavailability_reasons={"-5": "size"},
+            complete_source=False,
+            complete_inside=False,
+        )
+    )
+    assert source.unavailability_reasons == {"-5": "size"}
 
 
-def test_write_manifest_rejects_an_existing_incompatible_schema(tmp_path):
-    from thesis.data.manifest import ManifestSchemaError, write_manifest
+def test_complete_source_flag_must_match_availability_vector():
+    availability = {str(bin_id): True for bin_id in BIN_IDS}
+    availability["80"] = False
 
-    path = tmp_path / "manifest.duckdb"
-    with duckdb.connect(str(path)) as connection:
-        connection.execute("CREATE TABLE samples (sample_id VARCHAR PRIMARY KEY)")
-
-    with pytest.raises(ManifestSchemaError):
-        write_manifest(path, [])
-
-
-def test_diff_manifests_reports_changed_sample_ids(tmp_path):
-    from thesis.data.manifest import diff_manifests, write_manifest
-
-    first = tmp_path / "first.duckdb"
-    second = tmp_path / "second.duckdb"
-    row = fixed_level_row()
-    write_manifest(first, [row])
-    write_manifest(second, [{**row, "naip_year": 2023}])
-
-    assert diff_manifests(first, first) == []
-    assert diff_manifests(first, second) == [f"changed: {row['sample_id']}"]
+    with pytest.raises(ValidationError, match="complete_source"):
+        SourceRecord.model_validate(
+            _source(
+                bin_availability=availability,
+                unavailability_reasons={"80": "ownership"},
+                complete_source=True,
+            )
+        )
 
 
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"config_hash": ""},
-        {"config_hash": "a" * 63},
-        {"git_commit": ""},
-        {"git_commit": "g" * 40},
-        {"building_id": ""},
+        {"tip_row": 255},
+        {"tip_col": 255},
+        {"exact_signed_distance_m": 0.2},
+        {"exact_signed_distance_m": 1.8},
+        {"exact_signed_distance_m": -1.0, "ground_truth_inside": False},
+        {"nearest_edge_bearing_radians": 6.283185307179586},
     ],
 )
-def test_manifest_row_requires_complete_provenance_identifiers(overrides):
-    from thesis.data.manifest import ManifestRow
-
+def test_pin_enforces_tip_gap_bin_sign_and_bearing(overrides):
     with pytest.raises(ValidationError):
-        ManifestRow.model_validate(fixed_level_row(**overrides))
+        PinRecord.model_validate(_pin(**overrides))
+
+
+def test_run_requires_locked_gate_and_all_named_seeds():
+    with pytest.raises(ValidationError):
+        RunRecord.model_validate(_run(coverage_threshold=0.6))
+    with pytest.raises(ValidationError):
+        RunRecord.model_validate(_run(seeds={"candidate_order": 2}))
+
+
+def test_spill_deviation_requires_origin_and_destination_boxes():
+    with pytest.raises(ValidationError):
+        DeviationRecord.model_validate(
+            {
+                "run_id": "run-v2",
+                "deviation_id": "spill-1",
+                "deviation_type": "spill",
+                "source_id": "source-1",
+                "origin_box_id": "eco-9-box-1",
+                "destination_box_id": None,
+                "details": {},
+            }
+        )
+
+
+def test_writer_rejects_broken_foreign_keys(tmp_path):
+    bundle = _bundle()
+    broken = ManifestBundle(
+        run=bundle.run,
+        boxes=bundle.boxes,
+        sources=bundle.sources,
+        pins=(PinRecord.model_validate(_pin(source_id="missing")),),
+        renders=bundle.renders,
+        deviations=bundle.deviations,
+    )
+
+    with pytest.raises(ValueError, match="unknown source"):
+        write_manifest(tmp_path / "manifest.duckdb", broken)

@@ -1,191 +1,206 @@
-import argparse
 import json
-import runpy
-import sys
 
-import duckdb
 import geopandas as gpd
-import numpy as np
+import pandas as pd
 import pytest
-from shapely.geometry import Point, box
+from rasterio.transform import from_origin
+from shapely.geometry import box
 
-import thesis.run as run
-from thesis.data import naip
-from thesis.data.sampling import RetentionStage
-from thesis.geometry.displacement import DisplacedPin
-
-
-def _configs(tmp_path):
-    return {
-        "bins": {"fixed_levels_m": {"inside": [], "outside": [1]}, "target_tolerance_m": 0.1},
-        "imagery": {"cache_dir": tmp_path / "cache", "gsd_m": 1.0, "image_px": 10},
-        "overture": {"out": "footprints.parquet", "release": "release"},
-        "sampling": {"require_target_fully_inside": True, "reject_pin_on_other_footprint": True},
-    }
-
-
-def _candidate(building_id, geometry, anchor, **overrides):
-    row = {
-        "building_id": building_id,
-        "geometry": geometry,
-        "anchor_lon": anchor.x,
-        "anchor_lat": anchor.y,
-        "box_name": "box",
-        "state": "KS",
-        "ecoregion_code": "9.2",
-        "cell_selection_probability": 0.5,
-        "eligible_buildings_in_bbox": np.int64(10),
-        "sampled_buildings_in_bbox": np.int64(2),
-        "sampling_weight": 5.0,
-        "footprint_m2_area": 100.0,
-    }
-    row.update(overrides)
-    return row
+from thesis.geometry.scene_sampling import PinCandidate, SourceBinResult
+from thesis.run import (
+    CheckpointMismatch,
+    StageNotReady,
+    assign_naip_eligibility,
+    build_source_and_pin_rows,
+    require_passing_gate,
+    run_boxwise,
+    unavailability_report,
+    zero_eligible_reason,
+)
 
 
-def test_module_entrypoint_invokes_main(monkeypatch):
-    class MainInvoked(Exception):
-        pass
-
-    def stop_at_argument_parsing(self):
-        raise MainInvoked
-
-    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", stop_at_argument_parsing)
-    monkeypatch.setattr(run.overture, "extract", lambda config: pytest.fail("debug candidate build was invoked"))
-
-    with pytest.raises(MainInvoked):
-        runpy.run_module("thesis.run", run_name="__main__")
-
-
-def test_verify_against_accepts_a_dataset_directory(tmp_path, monkeypatch, capsys):
-    previous = tmp_path / "previous"
-    current = tmp_path / "current"
-    for directory in (previous, current):
-        directory.mkdir()
-        with duckdb.connect(str(directory / "manifest.duckdb")) as connection:
-            connection.execute("CREATE TABLE samples (sample_id VARCHAR PRIMARY KEY)")
-            connection.execute("INSERT INTO samples VALUES ('same-sample')")
-
-    monkeypatch.setattr(sys, "argv", ["thesis", "--out", str(current), "--verify-against", str(previous)])
-    monkeypatch.setattr(run, "build_core", lambda out_dir: [])
-    monkeypatch.setattr(run, "split_ablation_holdout", lambda tiles, holdout_size, seed: ([], []))
-    monkeypatch.setattr(run, "render_and_manifest", lambda tiles, out_dir: [])
-
-    run.main()
-
-    assert capsys.readouterr().out == "manifests identical\n"
-
-
-def test_displacement_rejects_targets_outside_image_and_pins_on_neighbors(tmp_path, monkeypatch):
-    configs = _configs(tmp_path)
-    candidates = gpd.GeoDataFrame(
-        [
-            _candidate("large", box(-6, -1, 6, 1), Point(0, 0)),
-            _candidate("target", box(19, -1, 21, 1), Point(20, 0)),
-        ],
-        crs="EPSG:5070",
-    )
-    all_footprints = gpd.GeoDataFrame(
+def test_naip_eligibility_checks_overlapping_quarter_quads_and_native_window():
+    sources = gpd.GeoDataFrame(
         {
-            "building_id": ["large", "target", "neighbor"],
-            "geometry": [box(-6, -1, 6, 1), box(19, -1, 21, 1), box(23, -1, 25, 1)],
+            "source_id": ["source"],
+            "scene_geometry_wkb": [box(-10, -10, 10, 10).wkb],
+            "geometry": [box(-1, -1, 1, 1)],
         },
         crs="EPSG:5070",
     )
+    items = [
+        {"id": "edge", "year": 2024, "gsd": 0.6, "geometry": box(-180, -90, -100, 90)},
+        {"id": "overlap", "year": 2024, "gsd": 0.6, "geometry": box(-180, -90, 180, 90)},
+    ]
+    transform = from_origin(-100, 100, 0.6, 0.6)
 
-    monkeypatch.setattr(run, "load_config", lambda key: configs[key])
-    monkeypatch.setattr(run.gpd, "read_parquet", lambda *args, **kwargs: all_footprints)
-    monkeypatch.setattr(run, "utm_epsg", lambda lon, lat: 5070)
-    monkeypatch.setattr(run, "to_utm", lambda geometry, epsg: geometry)
-    monkeypatch.setattr(run, "to_wgs84", lambda geometry, epsg: geometry)
-    monkeypatch.setattr(
-        run.displacement,
-        "generate_displacements",
-        lambda footprint, anchor, *args, **kwargs: (
-            DisplacedPin(1.0, 1.0, 0.0, Point(0, 0) if anchor.x == 0 else Point(24, 0)),
+    result = assign_naip_eligibility(
+        sources,
+        items,
+        gsd_m=0.6,
+        gsd_tolerance=0.01,
+        grid_loader=lambda item: {
+            "transform": tuple(transform[:6]),
+            "src_crs": "EPSG:5070",
+            "width": 400,
+            "height": 400,
+            "acquired_date": "2024-07-01",
+            "season": "summer",
+        },
+    )
+
+    assert result.rejections.empty
+    assert result.eligible["naip_item_id"].tolist() == ["overlap"]
+    assert result.eligible.iloc[0]["scene_window"] == (150, 150, 34, 34)
+
+
+def test_boxwise_screen_checkpoints_and_resumes(tmp_path):
+    calls = []
+
+    def first_pass(box_id, box_output):
+        calls.append(box_id)
+        if box_id == "b":
+            raise RuntimeError("synthetic interruption")
+        box_output.write_text(box_id)
+
+    with pytest.raises(RuntimeError, match="synthetic"):
+        run_boxwise(("a", "b", "c"), first_pass, tmp_path, config_hash="a" * 64, code_version="b" * 64)
+
+    checkpoint = json.loads((tmp_path / "screen-checkpoint.json").read_text())
+    assert checkpoint["completed_boxes"] == ["a"]
+
+    def second_pass(box_id, box_output):
+        calls.append(box_id)
+        box_output.write_text(box_id)
+
+    run_boxwise(("a", "b", "c"), second_pass, tmp_path, config_hash="a" * 64, code_version="b" * 64)
+
+    assert calls == ["a", "b", "b", "c"]
+    assert json.loads((tmp_path / "screen-checkpoint.json").read_text())["completed_boxes"] == ["a", "b", "c"]
+
+
+def test_boxwise_resume_rejects_config_or_code_drift(tmp_path):
+    run_boxwise(("a",), lambda box_id, path: path.write_text(box_id), tmp_path, "a" * 64, "b" * 40)
+
+    with pytest.raises(CheckpointMismatch):
+        run_boxwise(("a",), lambda *_: None, tmp_path, "c" * 64, "b" * 40)
+
+
+def _pin(bin_id, repeat_index, distance):
+    return PinCandidate(
+        source_id="source",
+        bin_id=bin_id,
+        repeat_index=repeat_index,
+        target_signed_distance_m=distance,
+        row=300,
+        col=301,
+        x=100.5,
+        y=200.5,
+        exact_signed_distance_m=distance,
+        nearest_polygon_id="source",
+        nearest_polygon_provenance="msft",
+        bearing_radians=1.0,
+    )
+
+
+def test_partial_scan_becomes_one_source_record_with_availability_and_pin_rows():
+    scan = SourceBinResult(
+        source_id="source",
+        pins_by_bin={1: (_pin(1, 0, 0.8), _pin(1, 1, 1.0), _pin(1, 2, 1.2))},
+        unavailable_reasons={-5: "size"},
+        innermost_signed_distance_m=-1.5,
+        outermost_signed_distance_m=80.0,
+    )
+
+    source, pins = build_source_and_pin_rows(
+        scan,
+        all_bin_ids=(-5, 1),
+        scene_window=(10, 20, 800, 800),
+        scene_item_id="item",
+    )
+
+    assert source["status"] == "eligible"
+    assert source["available_bin_count"] == 1
+    assert source["bin_availability"] == {"-5": False, "1": True}
+    assert source["unavailability_reasons"] == {"-5": "size"}
+    assert source["complete_source"] is False
+    assert source["scene_id"] == "4a60aca0462556af"
+    assert len(pins) == 3
+    assert all(row["scene_item_id"] == "item" for row in pins)
+
+
+def test_zero_bin_scan_remains_eligible_for_replacement():
+    scan = SourceBinResult(
+        source_id="zero",
+        pins_by_bin={},
+        unavailable_reasons={-5: "size", 1: "ownership"},
+        innermost_signed_distance_m=-0.5,
+        outermost_signed_distance_m=0.5,
+    )
+
+    source, pins = build_source_and_pin_rows(scan, (-5, 1), (0, 0, 800, 800), "item")
+
+    assert source["status"] == "eligible_zero_bins"
+    assert pins == []
+
+
+def test_unavailability_report_crosses_bin_reason_stratum_and_ecoregion():
+    sources = pd.DataFrame(
+        {
+            "source_id": ["a", "b"],
+            "building_stratum": ["small", "large"],
+            "ecoregion_code": ["9", "9"],
+            "unavailability_reasons": [{"-5": "size"}, {"80": "ownership"}],
+        }
+    )
+
+    report = unavailability_report(sources)
+
+    assert report.to_dict("records") == [
+        {"bin_id": -5, "reason": "size", "building_stratum": "small", "ecoregion_code": "9", "count": 1},
+        {"bin_id": 80, "reason": "ownership", "building_stratum": "large", "ecoregion_code": "9", "count": 1},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("inventory", "screen", "expected"),
+    [
+        (
+            {"full_pool_count": 0, "content_pool_count": 0, "rural_content_pool_count": 0, "box_contained_count": 0},
+            {"eligible_count": 0, "tile_rejections": {}},
+            "no_overture_buildings",
         ),
-    )
-
-    displaced, failures = run.displace_candidates(candidates)
-
-    assert displaced == []
-    assert [(failure["candidate_id"], failure["reason"]) for failure in failures] == [
-        ("large", "target_or_anchor_outside_image"),
-        ("target", "pin_on_other_footprint"),
-    ]
-
-
-def test_displacement_normalizes_numpy_counts_for_strict_manifest(tmp_path, monkeypatch):
-    configs = _configs(tmp_path)
-    configs["sampling"] = {"require_target_fully_inside": False, "reject_pin_on_other_footprint": False}
-    target = box(-1, -1, 1, 1)
-    candidates = gpd.GeoDataFrame([_candidate("target", target, Point(0, 0))], crs="EPSG:5070")
-
-    monkeypatch.setattr(run, "load_config", lambda key: configs[key])
-    monkeypatch.setattr(run.gpd, "read_parquet", lambda *args, **kwargs: candidates[["building_id", "geometry"]])
-    monkeypatch.setattr(run, "utm_epsg", lambda lon, lat: 5070)
-    monkeypatch.setattr(run, "to_utm", lambda geometry, epsg: geometry)
-    monkeypatch.setattr(run, "to_wgs84", lambda geometry, epsg: geometry)
-    monkeypatch.setattr(
-        run.displacement,
-        "generate_displacements",
-        lambda *args, **kwargs: (DisplacedPin(1.0, 1.0, 0.0, Point(2, 0)),),
-    )
-
-    displaced, _ = run.displace_candidates(candidates)
-
-    assert type(displaced[0]["eligible_buildings_in_bbox"]) is int
-    assert type(displaced[0]["sampled_buildings_in_bbox"]) is int
+        (
+            {"full_pool_count": 4, "content_pool_count": 0, "rural_content_pool_count": 0, "box_contained_count": 0},
+            {"eligible_count": 0, "tile_rejections": {}},
+            "content_filters",
+        ),
+        (
+            {"full_pool_count": 4, "content_pool_count": 3, "rural_content_pool_count": 0, "box_contained_count": 0},
+            {"eligible_count": 0, "tile_rejections": {}},
+            "scene_rurality",
+        ),
+        (
+            {"full_pool_count": 4, "content_pool_count": 3, "rural_content_pool_count": 2, "box_contained_count": 0},
+            {"eligible_count": 0, "tile_rejections": {}},
+            "box_containment",
+        ),
+        (
+            {"full_pool_count": 4, "content_pool_count": 3, "rural_content_pool_count": 2, "box_contained_count": 2},
+            {"eligible_count": 0, "tile_rejections": {"non_native_gsd": 2}},
+            "tile_containment:non_native_gsd",
+        ),
+    ],
+)
+def test_zero_eligible_reason_records_the_exact_loss_stage(inventory, screen, expected):
+    assert zero_eligible_reason(inventory, pd.Series(screen)) == expected
 
 
-def test_build_core_persists_failures_and_resumes_completed_imagery(tmp_path, monkeypatch):
-    out_dir = tmp_path / "dataset"
-    cache_dir = tmp_path / "cache"
-    pin = DisplacedPin(1.0, 1.0, 0.0, Point(1, 0))
-    entries = [
-        {"building_id": "ok", "pin_lat": 1.0, "pin_lon": 1.0, "pin": pin},
-        {"building_id": "no-imagery", "pin_lat": 2.0, "pin_lon": 2.0, "pin": pin},
-    ]
-    stage = RetentionStage("input", 2, 1.0, 1.0)
-    displacement_failure = {"candidate_id": "bad", "stage": "displacement", "reason": "unreachable"}
-    calls = {"fetch": 0}
-
-    monkeypatch.setattr(run, "compute_config_hash", lambda: "a" * 64)
-    monkeypatch.setattr(run, "build_candidates", lambda: (object(), [stage]))
-    monkeypatch.setattr(run, "displace_candidates", lambda candidates: (entries, [displacement_failure]))
-    monkeypatch.setattr(
-        run,
-        "load_config",
-        lambda key: {"cache_dir": cache_dir, "gsd_m": 1.0, "image_px": 2} if key == "imagery" else {},
-    )
-
-    def fetch_tile(*, lat, lon, gsd, size, config):
-        calls["fetch"] += 1
-        if lon == 2.0:
-            raise naip.NoValidItem("none")
-        metadata = {"item_id": "item", "col_off": 3, "row_off": 4, "size": size}
-        tile = naip.Tile(np.zeros((3, size, size), dtype=np.uint8), metadata)
-        naip.store_atomic(cache_dir, naip.cache_key("item", 3, 4, size), tile.array, tile.metadata)
-        return tile
-
-    monkeypatch.setattr(run.naip, "fetch_tile", fetch_tile)
-
-    first = run.build_core(out_dir)
-
-    assert len(first) == 1
-    checkpoint = json.loads((out_dir / "checkpoint.json").read_text())
-    failures = json.loads((out_dir / "failures.json").read_text())
-    assert checkpoint["stage"] == "imagery_complete"
-    assert checkpoint["sampling_stages"] == [
-        {"name": "input", "count": 2, "fraction_of_input": 1.0, "fraction_of_previous": 1.0}
-    ]
-    assert [failure["candidate_id"] for failure in failures] == ["bad", "no-imagery"]
-
-    monkeypatch.setattr(run, "build_candidates", lambda: pytest.fail("candidate stage was recomputed"))
-    monkeypatch.setattr(run, "displace_candidates", lambda candidates: pytest.fail("displacement was recomputed"))
-    monkeypatch.setattr(run.naip, "fetch_tile", lambda **kwargs: pytest.fail("completed pin was fetched again"))
-
-    second = run.build_core(out_dir)
-
-    assert len(second) == 1
-    assert calls["fetch"] == 2
+def test_render_stage_requires_a_passing_gate(tmp_path):
+    with pytest.raises(StageNotReady, match="gate report"):
+        require_passing_gate(tmp_path)
+    (tmp_path / "gate.json").write_text(json.dumps({"passed": False, "failure": "coverage"}))
+    with pytest.raises(StageNotReady, match="coverage"):
+        require_passing_gate(tmp_path)
+    (tmp_path / "gate.json").write_text(json.dumps({"passed": True}))
+    require_passing_gate(tmp_path)

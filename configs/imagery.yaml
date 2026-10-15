@@ -4,9 +4,15 @@ collection: naip
 asset: image
 gsd_m: 0.6
 image_px: 512
+tip_row: 256
+tip_col: 256
+scene_slack_m: 1.2
+scene_max_distance_m: 80.0
 bands: [r, g, b] # dont need infrared
 year_policy: most_recent # newest 0.6m per state
 year_min: 2018
-cache_dir: data/naip_cache/
+scene_cache_dir: data/naip_scene_cache/
 gsd_tolerance: 0.01
 if_on_edge: reject
+allow_mosaic: false
+allow_resample: false

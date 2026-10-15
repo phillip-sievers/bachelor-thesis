@@ -39,22 +39,25 @@ def classify(
     image: bytes,
     prompt: str,
     *,
+    task: str = "verification",
     clients: Sequence[VLMClient] | None = None,
 ) -> dict[str, ClassifyResponse]:
-    results = run_dataset([(image, prompt)], clients=clients)
+    results = run_dataset([(image, prompt)], task=task, clients=clients)
     return {provider: responses[0] for provider, responses in results.items()}
 
 
 def run_dataset(
     items: list[tuple[bytes, str]],
     *,
+    task: str = "verification",
+    repeat: int = 0,
     clients: Sequence[VLMClient] | None = None,
 ) -> dict[str, list[ClassifyResponse]]:
     active_clients = configured_clients() if clients is None else clients
 
     def run_provider(client: VLMClient) -> list[ClassifyResponse]:
         with ThreadPoolExecutor(max_workers=POOL_SIZE) as pool:
-            return list(pool.map(lambda item: client.classify(*item), items))
+            return list(pool.map(lambda item: client.classify(*item, task=task, repeat=repeat), items))
 
     with ThreadPoolExecutor(max_workers=len(active_clients)) as outer:
         futures = {client.provider: outer.submit(run_provider, client) for client in active_clients}

@@ -1,8 +1,56 @@
 min_footprint_area_m2: 100
 max_aspect_ratio: 6
 
+dataset_v2:
+    box_geometry_artifact: data/sampling_frame/selected_bboxes.parquet
+    main_sources: 2000
+    ablation_sources: 100
+    main_box_quotas:
+        boxes_at_17: 80
+        sources: 17
+        remaining_boxes_sources: 16
+    building_strata:
+        method: weighted_log_area_tertiles
+        population: scene_rural_content_pool_before_mechanical_eligibility
+        weight: inverse_scene_rural_content_pool_count_per_box
+        frozen_log_area_cuts: [5.0452346355471915, 5.518237342793738]
+        frozen_area_m2_cuts: [155.28072930318254, 249.19540376779258]
+        labels: [small, medium, large]
+    ecoregion_merge_mapping:
+        '5': '5'
+        '6': '6'
+        '7': '7'
+        '8': '8'
+        '9': '9'
+        '10': '10'
+        '11': '11'
+        '12': '12'
+        '13': '13'
+        '15': '15'
+    gate:
+        minimum_bin_coverage: 0.5
+        required_main_sources: 2000
+        zero_eligible_box_requires_reason: true
+    screen:
+        per_box_cap: 200
+        audit_weight: inverse_screened_count_per_box
+    spill:
+        order: [same_level_1_ecoregion, adjacent_level_1_ecoregion]
+        receiving_order: seeded_round_robin
+        revisit_fraction_of_main: 0.05
+        adjacency: shared_polygon_boundary
+    seeds:
+        box_quota: 20260824011
+        screen_subsample: 20260824012
+        candidate_order: 20260824013
+        pin_sampling: 20260824014
+        ablation_assignment: 20260824015
+        deficit_spill: 20260824016
+        delta_reduction: 20260824017
+        sanity_render: 20260824018
+
 sampling_frame:
-    target_population: eligible_overture_buildings_in_census_rural_conus
+    target_population: valid_content_filtered_overture_buildings_with_fully_rural_scenes
     design: stratified_two_stage_cluster
     seed: 20260824001
     stratum: cec_level_1_ecoregion
@@ -21,22 +69,18 @@ sampling_frame:
         empty_bbox_policy: retain_in_audit
         sparse_bbox_policy: retain_all_available
     building_sampling:
-        method: balanced_uniform_without_replacement
+        method: seeded_joint_nonoverlap
         target_unique_buildings: 2100
-        maximum_buildings_per_bbox: 20
-        candidate_capacity_at_20_per_bbox: 2400
-        balance_fields: [bbox, state, ecoregion_code]
-        allocation: equal_bbox_base_then_deterministic_capacity_redistribution
-        sparse_group_policy: take_all_then_redistribute_shortfall
-        unreachable_target_policy: use_realized_size
+        main_allocation: equal_box_80x17_plus_40x16
+        ablation_allocation: at_most_one_per_box_by_level_1_ecoregion_x_area_stratum
+        deficit_policy: spill_within_then_adjacent_level_1_ecoregion
         freeze_selected_building_ids: true
-        max_samples_per_building_per_condition: 1
     analysis:
-        primary_estimand: population_weighted_mean_over_eligible_rural_buildings
-        secondary_estimand: equal_ecoregion_macro_average
+        primary_estimand: unweighted_equal_count_per_box_design
+        secondary_estimand: eligible_count_weighted_population_estimate
         cluster_units: [bbox, building_id]
         poststratification_fields: [state, ecoregion_code]
-        population_weight_formula: candidate_cells_in_ecoregion_over_selected_cells_times_eligible_buildings_in_bbox_over_sampled_buildings_in_bbox
+        sensitivity_weight_formula: inverse_realized_sample_count_per_box
 
 ecoregions:
     standard: CEC North American Terrestrial Ecoregions Level I
@@ -66,4 +110,4 @@ census_urban:
     url: https://www2.census.gov/geo/tiger/TIGER2025/UAC20/tl_2025_us_uac20.zip
     path: data/census/tl_2025_us_uac20.zip
     sha256: e28a0b738230496b66038756a80eb1f04f9bf8c622dc2578ee46f885bb1c059c
-    buffer_m: 100
+    buffer_m: 0

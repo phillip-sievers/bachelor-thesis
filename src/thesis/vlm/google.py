@@ -19,13 +19,19 @@ class GoogleAdapter(VLMClient):
         cache_dir: Path | None = None,
     ):
         super().__init__(config, pricing_basis=pricing_basis, cache_dir=cache_dir)
-        self.client = client if client is not None else genai.Client()
+        # timeout in ms, otherwise dead connections hang forever and block the slice
+        self.client = client if client is not None else genai.Client(http_options={"timeout": 120_000})
+
+    def _generation_config(self) -> dict[str, Any]:
+        # TODO: Make sure that the interactions API accepts these names before you set values.
+        common = self._common_settings({"temperature": "temperature", "max_output_tokens": "max_output_tokens"})
+        return {**self.config["parameters"]["thinking_config"], **common}
 
     def _request_settings(self) -> dict[str, Any]:
         parameters = self.config["parameters"]
         return {
             "model": self.config["model"],
-            "generation_config": parameters["thinking_config"],
+            "generation_config": self._generation_config(),
             "image": {"mime_type": "image/png", "resolution": parameters["media_resolution"]},
         }
 
@@ -42,7 +48,7 @@ class GoogleAdapter(VLMClient):
                     "resolution": parameters["media_resolution"],
                 },
             ],
-            generation_config=parameters["thinking_config"],
+            generation_config=self._generation_config(),
         )
 
     def _parse_response(

@@ -45,7 +45,7 @@ def draw_dot(context: cairo.Context, x, y, px_size, color, opacity) -> cairo.Con
 def draw_crosshair(context: cairo.Context, x, y, px_size, color, opacity):
     r, g, b = [c / 255 for c in color]
     line_width = px_size / 10
-    radius = px_size / 2 - line_width / 2 - 1
+    radius = px_size / 2 - line_width / 2 - 1.5
     context.set_source_rgba(r, g, b, opacity)
     context.set_line_width(line_width)
     context.arc(x, y, radius, 0, 2 * np.pi)
@@ -74,18 +74,49 @@ def draw_google_pin(px_size, color) -> cairo.ImageSurface:
     return cairo.ImageSurface.create_from_png(io.BytesIO(png_bytes))
 
 
+def marker_hotspot(shape: str, size_px: int) -> tuple[int, int]:
+    if size_px <= 0:
+        raise ValueError("marker size must be positive")
+    if shape == "google_pin":
+        return size_px // 2, size_px - 1
+    if shape in {"dot", "crosshair"}:
+        return size_px // 2, size_px // 2
+    raise ValueError(f"Unknown shape: {shape}")
+
+
 def draw_marker(array, px, py, shape, color, size_px, opacity):
     if shape == "google_pin":
         surface = draw_google_pin(size_px, color)
     else:
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size_px, size_px)
         ctx = cairo.Context(surface)
+        hotspot_x, hotspot_y = marker_hotspot(shape, size_px)
+        center_x, center_y = hotspot_x + 0.5, hotspot_y + 0.5
         if shape == "dot":
-            draw_dot(ctx, size_px / 2, size_px / 2, size_px, color, opacity)
+            draw_dot(ctx, center_x, center_y, size_px, color, opacity)
         elif shape == "crosshair":
-            draw_crosshair(ctx, size_px / 2, size_px / 2, size_px, color, opacity)
+            draw_crosshair(ctx, center_x, center_y, size_px, color, opacity)
         else:
             raise ValueError(f"Unknown shape: {shape}")
     patch_rgba = surface_to_rgba(surface)
-    hotspot = (patch_rgba.shape[1] // 2, patch_rgba.shape[0] - 1) if shape == "google_pin" else None
+    hotspot = marker_hotspot(shape, size_px)
     return composite_patch(array, patch_rgba, px, py, hotspot=hotspot)
+
+
+def render_at_tip(array: np.ndarray, preset: dict | None, tip: tuple[int, int] = (256, 256)) -> np.ndarray:
+    if array.shape != (3, 512, 512):
+        raise ValueError(f"rendering requires a native RGB 512px crop, got {array.shape}")
+    tip_row, tip_col = tip
+    if (tip_row, tip_col) != (256, 256):
+        raise ValueError("dataset v2 marker tip must be at (row, col) = (256, 256)")
+    if preset is None:
+        return array.copy()
+    return draw_marker(
+        array,
+        px=tip_col,
+        py=tip_row,
+        shape=preset["shape"],
+        color=preset["color"],
+        size_px=preset["size_px"],
+        opacity=preset["opacity"],
+    )

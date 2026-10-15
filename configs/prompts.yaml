@@ -25,3 +25,10 @@ prompts:
       Rooftop is defined as only the main roof surfaces, detached outbuildings, overhangs or porch decks shouldn't count into your analysis.
       If the majority of the marked point lies on the roof answer with yes, otherwise answer with no.
       You have only two options to answer: Yes or No. Answer with only a single word, one of the two
+distance_prompts:
+  - id: roleplaying
+    text: |
+      You are a geospatial expert. The aerial image presented shows a marker in a rural area. The image is 512x512 pixels at 0.6 m per pixel.
+      Analyse the image and determine precisely how far away the marker is from the closest roof edge.
+      If the marker lies on the roof, answer the distance to the closest edge with a negative number. If it lies outside, away from the roof with a positive number. Dont answer with 0.
+      Answer only with a single line. You have to adhere to the format: distance: <whole meters>

@@ -3371,6 +3371,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rasterio" },
     { name = "scikit-learn" },
+    { name = "scipy" },
 ]
 
 [package.dev-dependencies]
@@ -3398,6 +3399,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rasterio", specifier = ">=1.5.1" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
+    { name = "scipy", specifier = ">=1.17.0" },
 ]
 
 [package.metadata.requires-dev]

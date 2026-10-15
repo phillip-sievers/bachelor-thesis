@@ -10,7 +10,7 @@ from thesis.vlm.claude import AnthropicAdapter
 from thesis.vlm.google import GoogleAdapter
 from thesis.vlm.openai import OpenAIAdapter
 from thesis.vlm.run import classify, configured_clients
-from thesis.vlm.vlm_adapter import VLMResponse, _cache_key, parse_binary_answer
+from thesis.vlm.vlm_adapter import VLMResponse, _cache_key, _prepare_request, parse_binary_answer
 
 
 class Recorder:
@@ -355,7 +355,7 @@ def test_classify_runs_identical_input_through_every_client():
             self.provider = provider
             self.calls = []
 
-        def classify(self, passed_image, passed_prompt):
+        def classify(self, passed_image, passed_prompt, task="verification", repeat=0):
             self.calls.append((passed_image, passed_prompt))
             return self.provider
 
@@ -453,3 +453,55 @@ def test_classify_raises_after_retries(model_config, tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="big time failure 3"):
         adapter.classify(image, prompt)
+
+
+def test_anthropic_batch_fills_cache_with_live_request_body_and_batch_price(model_config, tmp_path):
+    models, pricing_basis = model_config
+    usage = SimpleNamespace(input_tokens=399, output_tokens=8, output_tokens_details=SimpleNamespace(thinking_tokens=3))
+    message = RawResponse(
+        id="msg-1",
+        model="claude-opus-5",
+        content=[SimpleNamespace(type="text", text="distance: -3 m")],
+        usage=usage,
+        stop_reason="end_turn",
+        stop_details=None,
+    )
+
+    class Batches:
+        def __init__(self):
+            self.requests = []
+
+        def create(self, requests, **_):
+            self.requests = requests
+            return SimpleNamespace(id="batch-1")
+
+        def retrieve(self, batch_id, **_):
+            return SimpleNamespace(processing_status="ended")
+
+        def results(self, batch_id, **_):
+            return [
+                SimpleNamespace(custom_id=r["custom_id"], result=SimpleNamespace(type="succeeded", message=message))
+                for r in self.requests
+            ]
+
+    batches = Batches()
+    live = Recorder(message)
+    live.batches = batches
+    adapter = AnthropicAdapter(
+        models["anthropic"], pricing_basis=pricing_basis, client=SimpleNamespace(messages=live), cache_dir=tmp_path
+    )
+    image = png_header()
+
+    assert adapter.batch_classify([(image, "prompt"), (image, "prompt")], task="distance") == ["batch-1"]
+    assert len(batches.requests) == 1
+    assert batches.requests[0]["params"] == adapter._request_body(_prepare_request(image, "prompt"))
+    assert adapter.collect_batch("batch-1") == 1
+
+    result = adapter.classify(image, "prompt", task="distance")
+    assert result.cache_hit and live.calls == []
+    assert result.vlm_response.parsed_answer == "-3"
+    assert result.vlm_response.price_schedule["tier"] == "batch"
+    assert result.vlm_response.cost == pytest.approx(0.002195 / 2)
+    assert adapter.batch_classify([(image, "prompt")], task="distance") == []
+    assert adapter.batch_classify([(image, "other prompt")], task="distance") == ["batch-1"]
+    assert adapter.batch_classify([(image, "other prompt")], task="distance") == []  # pending, not resubmitted

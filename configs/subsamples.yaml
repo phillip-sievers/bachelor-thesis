@@ -1,0 +1,12 @@
+# Post-construction subsample draws. Not in run.yaml: the frozen construction config hash is unaffected.
+# Two-stage: boxes stratified by ecoregion (proportional to box count, at least min_boxes_per_ecoregion),
+# then sources_per_box rows per box. n = target rows; realised n can differ slightly (rounding, small boxes).
+sources_per_box: 2
+min_boxes_per_ecoregion: 3
+draws:
+  edge_distance: {n: 200, seed: 20261004001}
+  human_comparison: {n: 200, seed: 20261004002}   # one random primary-bin pin per drawn source
+  failure_mode: {n: 30, seed: 20261004003}        # per model, misclassified primary verification pins, equal per bin
+# is_building_r2 in gold_dataset_filtering.ipynb, own draw: 50 previous negatives + 50 previous positives.
+# Enriched 50/50, so agreement is not the agreement rate on the whole dataset.
+agreement_n: 100

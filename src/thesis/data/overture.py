@@ -1,3 +1,6 @@
+"""Cached Overture extraction with provenance for source and union labels (D03, D07, D17)."""
+
+import os
 from pathlib import Path
 
 import duckdb as db
@@ -110,7 +113,8 @@ def build_footprints(con, config) -> None:
         ST_X(ST_PointOnSurface(r.geometry)) AS anchor_lon,
         ST_Y(ST_PointOnSurface(r.geometry)) AS anchor_lat,
         ST_IsValid(r.geometry) AS is_valid,
-        ST_GeometryType(r.geometry) as geometry_type
+        ST_GeometryType(r.geometry) as geometry_type,
+        to_json(r.sources) AS provenance
     FROM raw_buildings r
     JOIN boxes b ON r.box_name = b.name
     WHERE r.is_underground IS NOT TRUE;
@@ -118,7 +122,10 @@ def build_footprints(con, config) -> None:
 
 
 def write_geoparquet(con, out: Path) -> Path:
-    con.execute(f"COPY footprints TO '{out}' (FORMAT PARQUET)")
+    temporary = out.with_name(f".{out.name}.tmp")
+    temporary.unlink(missing_ok=True)
+    con.execute(f"COPY footprints TO '{temporary}' (FORMAT PARQUET)")
+    os.replace(temporary, out)
     return out
 
 
@@ -126,7 +133,10 @@ def extract(config: dict) -> Path:
     cache = REPO_ROOT / Path(config["cache"])
     cache.parent.mkdir(parents=True, exist_ok=True)
     con = connect(cache)
-    fetch_raw(con, config)
-    build_footprints(con, config)
-    out = REPO_ROOT / Path(config["out"])
-    return write_geoparquet(con, out)
+    try:
+        fetch_raw(con, config)
+        build_footprints(con, config)
+        out = REPO_ROOT / Path(config["out"])
+        return write_geoparquet(con, out)
+    finally:
+        con.close()

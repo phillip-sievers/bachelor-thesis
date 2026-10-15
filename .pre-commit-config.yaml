@@ -16,5 +16,5 @@ repos:
           - id: check-yaml
           - id: end-of-file-fixer
           - id: check-added-large-files
-            # if im dumping data fix this
-            args: ["--maxkb=7000"]
+            # if im dumping data fix this. notebooks are big... all images
+            args: ["--maxkb=500000"]

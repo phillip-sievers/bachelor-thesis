@@ -1,0 +1,6 @@
+# Common inference settings for all three adapters. Placeholders, not frozen.
+# null = parameter not sent, provider default applies (and request settings / cache keys stay unchanged).
+# temperature: reasoning/thinking modes restrict it per provider, check docs before setting.
+temperature: null
+# max_output_tokens: includes thinking tokens at all three providers. null = no cap; Anthropic requires one and falls back to 16000.
+max_output_tokens: null

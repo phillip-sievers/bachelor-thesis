@@ -1,0 +1,52 @@
+# Scorer settings. Not in run.yaml: the frozen construction config hash is unaffected.
+bootstrap_replicates: 10000
+bootstrap_seed: 20261004101
+# primary: design_weighted, item weight (N_h/m_h)/n_box (>= 3 boxes per ecoregion breaks proportional allocation:
+# N_h/m_h spans 10.7 to 122.2). Sensitivity: per_box_mean (1/n_box) and pooled.
+estimand: design_weighted
+invalid_policy: wrong    # primary; exclude reported as sensitivity check
+# ±1 m bins are out of the primary analysis (edge measurement: 29% label flips); no δ filter
+primary_bins: [-5, -3, 3, 5, 10, 20, 40, 80]
+# v1 ablation leakage (2026-10-05): v2 main sources with a v1 ablation building within 160 m (inside the ±154 m crop).
+# The verification prompt and marker were selected on v1 images, so these are excluded from the main analysis.
+# distance_m 0.0 = same building. Proof: data/ablation/manifest.duckdb vs selection/sources.parquet anchors.
+excluded_sources:
+  - {source_id: 12e8f121-4f0f-4fb2-aca5-6a09993b014f, v1_building_id: d1630428-86af-4fe7-b6d3-ca3b5a3e0fb4, distance_m: 124.1}
+  - {source_id: 24520db9-5ac5-4096-af69-044403679f56, v1_building_id: c8e271bd-8912-44c5-a5ae-0215e5c3d523, distance_m: 53.2}
+  - {source_id: 2888c369-7da1-400b-beea-8ae8bcac04eb, v1_building_id: 516578b9-6e37-4ea4-944d-07334f07ae23, distance_m: 116.7}
+  - {source_id: 30cc0853-ea64-4115-a5d1-e7771d2329ff, v1_building_id: 30cc0853-ea64-4115-a5d1-e7771d2329ff, distance_m: 0.0}
+  - {source_id: 31e08b60-4dfc-418a-a063-9bf3971b2735, v1_building_id: 31e08b60-4dfc-418a-a063-9bf3971b2735, distance_m: 0.0}
+  - {source_id: 3ceac55e-17cc-4f58-8ef4-5f9e72ed5c21, v1_building_id: b486110e-19ff-4b5f-ab8f-7a55ac29b73f, distance_m: 118.1}
+  - {source_id: 4798ae45-eece-47b0-bc64-086988b0828b, v1_building_id: be19cd32-859d-444a-bcc3-f3d5a58d59f7, distance_m: 64.9}
+  - {source_id: 4c9c4466-9922-4fd7-bb24-dceb6117a18d, v1_building_id: 558f9a0d-9247-4486-98d2-5c5ce47803b4, distance_m: 74.7}
+  - {source_id: 56ab43b5-55e0-4923-8872-1400086597d2, v1_building_id: 56ab43b5-55e0-4923-8872-1400086597d2, distance_m: 0.0}
+  - {source_id: 6776a93e-2e32-4a68-b7d2-f1195eba15de, v1_building_id: 6776a93e-2e32-4a68-b7d2-f1195eba15de, distance_m: 0.0}
+  - {source_id: 92299f08-60f6-4980-9921-3952fa53db46, v1_building_id: 92299f08-60f6-4980-9921-3952fa53db46, distance_m: 0.0}
+  - {source_id: 9fba7cfd-df3b-444a-9275-de3afc158a06, v1_building_id: 9fba7cfd-df3b-444a-9275-de3afc158a06, distance_m: 0.0}
+  - {source_id: ae95bbf3-cae4-4543-9a68-42f5c110c284, v1_building_id: 6ae31198-e371-43b3-8a0d-acd122cbecd0, distance_m: 114.5}
+  - {source_id: b2d01a68-7c69-4f55-8947-3643a21c92e0, v1_building_id: c99ec6ad-85fa-4466-9577-bcdadd4f7744, distance_m: 90.6}
+  - {source_id: b84da347-0cd4-4a38-9836-08ac70b16d2b, v1_building_id: 5ed89576-02e5-4cd3-ab58-974d5c36791a, distance_m: 48.0}
+  - {source_id: c6f44058-b65b-407c-a5ce-682c66998f76, v1_building_id: 2d3acc1d-8f2b-42f2-a70a-711d2b404557, distance_m: 33.0}
+  - {source_id: d003f5b9-599b-42b9-aa2d-ba762116d30a, v1_building_id: 0c27e7d4-15e0-4860-9e15-3bc20c240a73, distance_m: 112.3}
+# N_h / m_h per CEC Level-I ecoregion: candidate cells / selected boxes (data/sampling_frame/selected_bboxes.parquet)
+stratum_weights:
+  '5': 83.85714285714286  # N_h=587, m_h=7
+  '6': 100.53846153846153  # N_h=1307, m_h=13
+  '7': 31.5  # N_h=126, m_h=4
+  '8': 120.29032258064517  # N_h=3729, m_h=31
+  '9': 122.20689655172414  # N_h=3544, m_h=29
+  '10': 111.6  # N_h=2232, m_h=20
+  '11': 47.4  # N_h=237, m_h=5
+  '12': 17.75  # N_h=71, m_h=4
+  '13': 43.5  # N_h=174, m_h=4
+  '15': 10.666666666666666  # N_h=32, m_h=3
+# human reference accuracy on the 195 analysed RQ1 pins (gold/human_on_roof.jsonl)
+tau: 0.928
+reliability_boundary: |
+  For each model, compute the weighted accuracy (TNR) of each outside primary bin
+  b in {3, 5, 10, 20, 40, 80} and its lower 95% bound LCB_b
+  (2.5% percentile over the same B = 10,000 paired box draws).
+  b* = the smallest b such that LCB_b' >= tau for every b' >= b.
+  If LCB_80 < tau, b* = "not reached". tau = 0.928.
+  Inside bins (-5, -3): no boundary, report accuracy only. Descriptive, not in the Holm family.
+# task 2 pass condition: 97.5% percentile of the weighted median log error (same draws, same weights) < best-constant baseline

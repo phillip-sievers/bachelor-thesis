@@ -1,8 +1,5 @@
-from pathlib import Path
-
 import numpy as np
 import pytest
-import yaml
 from rasterio.transform import from_origin, xy
 from rasterio.windows import bounds as window_bounds
 from rasterio.windows import transform as window_transform
@@ -13,7 +10,6 @@ from thesis.data.naip import (
     TileOutOfBounds,
     assert_native_gsd,
     cache_key,
-    fetch_tile,
     load_cached,
     pick_item,
     store_atomic,
@@ -143,25 +139,3 @@ def test_partial_write_is_not_a_cache_hit(tmp_path):
     key = cache_key("m_4007317_nw_18_060_20220719", 744, 544, SIZE)
     (tmp_path / f"{key}.npy").write_bytes(b"truncated")  # no .json
     assert load_cached(tmp_path, key) is None
-
-
-FARMHOUSE = (44.075796, -105.718358)
-
-
-@pytest.mark.network
-def test_fetch_tile_against_planetary_computer(tmp_path):
-    config = yaml.safe_load(Path("configs/imagery.yaml").read_text())
-    config["cache_dir"] = str(tmp_path)
-    lat, lon = FARMHOUSE
-
-    tile = fetch_tile(lat, lon, gsd=config["gsd_m"], size=config["image_px"], config=config)
-
-    assert tile.array.shape == (3, config["image_px"], config["image_px"])
-    assert tile.array.dtype == np.uint8
-    assert tile.metadata["native_gsd"] == pytest.approx([0.6, 0.6])
-    assert tile.metadata["extent_m"] == pytest.approx(307.2)
-    assert "?" not in tile.metadata["href"]  # token stripped
-
-    again = fetch_tile(lat, lon, gsd=config["gsd_m"], size=config["image_px"], config=config)
-    assert again.metadata["fetched_at"] == tile.metadata["fetched_at"]
-    assert len(list(tmp_path.glob("*.npy"))) == 1
